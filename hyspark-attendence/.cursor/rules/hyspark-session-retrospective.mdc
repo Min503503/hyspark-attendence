@@ -1,0 +1,102 @@
+---
+description: HySpark 세션 회고 — 오해·반복 실수 금지 (2026-06)
+alwaysApply: true
+---
+
+# HySpark Attendance — 세션 회고 & 재발 방지
+
+**범용 규칙 먼저:** `~/.cursor/rules/agent-retrospective-global.mdc` · `Documents/docs/AGENT_RETROSPECTIVE_GLOBAL.md`  
+아래는 **HySpark 전용**이다. **같은 실수를 두 번 하지 않는다.**
+
+## 0. 초기·인프라 실수 (한 번만 겪으면 됨)
+
+| 문제 | 원인 | 재발 방지 |
+|------|------|-----------|
+| 관리자 사이트 안 열림 | Firebase `/` → `/#/admin` 서버 리다이렉트 → hash 무한 루프 | hash 리다이렉트 금지. `VITE_PORTAL` 빌드 분리 + 앱 내부 라우팅 |
+| 잘못된 앱 배포 | `project-code`에 배포 (구본) | **항상 `hyspark-attendence/`** 만 빌드·배포. `archive/` 수정 금지 |
+| 단일 URL만 제공 | admin/member 미분리 | admin·member **각각** Firebase site + URL 표로 전달 |
+| Supabase link 실패 | 구 ref `utwzwlowluxrdlifypzx` 안내 | HySpark ref **`lwbjprzrnmlnmzlxiwrv`** 만 사용 |
+| Gmail 계정 3번 바뀜 | 확정 전마다 코드·문서 수정 | **최종 계정 확정 후** 한 번에 반영 (`choimeans2@gmail.com`) |
+| 「다 해」「100% 옮겨」 | CLI 단계만 사용자에게 넘김 | 터미널·파일 경로 주어지면 **에이전트가 직접 실행**. 막히면 막힌 지점만 보고 |
+
+## 1. 명령 오해 (의도 vs 구현)
+
+| 사용자 의도 | 잘못 이해했던 것 | 올바른 해석 |
+|------------|----------------|------------|
+| 자동 발송 규칙 4종 (①5일 ②1일 ③오픈 ④체크인완료) | 3개만 UI/DB에 반영 | 4종 전부 `emailAutomation.ts` + DB + Admin UI |
+| 규칙 카드 클릭 | 별도 미리보기/실행 탭, 또는 실행 버튼만 강조 | **그 규칙의 메일·발송 조건·예정 시각**을 카드 아래에 바로 표시 |
+| 「자동으로 간다」 | 자동화 실행 UI를 없애거나, 반대로 수동 실행만 강조 | 발송은 cron 자동; UI는 **신뢰(마지막 실행·sent/skipped)** + 수동 실행은 보조 |
+| 메일 미리보기 | 테스트 탭과 분리·고정 멤버·샘플만 | 실제 세션 기준 + **멤버 선택 가능** (자동·테스트·수동 발송) |
+| 수동 발송 HTML 틀 | 클라이언트(AdminEmail)만 수정 | **서버** `send-member-email`에서 `manual: true` 래핑 → AdminMembers 포함 |
+| 출석 코드 | 메일에 코드 노출 | 코드는 **강의실 화면 전용** — 메일에 넣지 않음 |
+| 네이버 지도 / 결석 CTA | 버튼 UI | **텍스트 링크** (버튼 아님) |
+| 배포 전 점검 | curl/grep만 하고 끝 | 사용자 관점 체크리스트 + 테스트 + **프론트/엣지 동기화 확인** |
+| 「배포하지마」 | 계속 배포·빌드 진행 | **즉시 중단**. 디자인·수정 완료 후 사용자 재요청까지 deploy 금지 |
+
+## 2. 반복 실수 (절대 금지)
+
+### A. 사용자가 요청한 것을 빼먹음
+- 세션 **장소 카드**를 `venue_name` 없을 때 숨김 → **금지**. `resolveVenueDisplayName()` + placeholder.
+- 리팩터·「간소화」할 때 기존 요구사항 삭제 → **변경 전후 체크리스트** 필수.
+- 관련 규칙: `user-requirements.mdc`, `email-venue-card.mdc`
+
+### B. 프론트만 고치고 프로덕션 메일은 그대로
+- 실제 발송 HTML = `supabase/functions/_shared/email-html-templates.ts`
+- `src/lib/emailHtmlTemplates.ts` 수정 시 **반드시 Deno 미러 동기화** + `npm test`
+- 수동 발송·멤버 관리 메일 등 **같은 API**는 서버에서 공통 HTML 래핑 (`manual-email-html.mdc`)
+- 배포: hosting **+** `npm run gmail:deploy` (send-member-email). Edge만 변경 시 프론트 재배포 불필요 명시
+
+### C. 멤버 링크 잘못
+- `/#/member` 사용 금지 → 운영진 더미 노출
+- `memberPortalUrl('absence'|'checkin')` → `/#/?intent=...`
+- 결석 링크는 **이름 입력 초기 화면**부터 (로그인된 운영진 이름 노출 금지)
+
+### D. 배포 타이밍
+- 사용자가 **「배포하지마」「잠만」** 하면 즉시 중단
+- 배포는 **명시적 요청** 후에만 (`AGENTS.md`)
+- 「최종 점검」요청 ≠ 무조건 배포. 점검 결과 보고 후 또는 「배포해」 확인
+- Admin만 변경 → `deploy:admin`. Member UI → `build:member` + member hosting
+
+### E. 점검을 대충 보고
+- 「촘촘히」「사용자 입장에서」= 체크리스트 항목별 결과 제시
+- 브라우저 불가 시: **한계 명시** + 테스트·빌드·엣지 동기화 diff·핵심 grep으로 대체
+- Subagent/Task 중단되면 **직접 이어서 완료** — 「중단됐습니다」「Agent 모드로 전환해주세요」만 남기지 않음
+
+### F. DB/인프라 가정
+- 규칙 ON/OFF 안 됨 → `email_automation_rules` **CHECK constraint** 확인 (`checkin_complete` 등)
+- Supabase project-ref: **`lwbjprzrnmlnmzlxiwrv`** (HySpark). 다른 ref 쓰지 않음
+- Gmail 발신: **`choimeans2@gmail.com`** 계정 기준 OAuth (사용자 최종 확정)
+
+### G. 디자인 회귀
+- 이메일: **토스 스타일** Pretendard, 로고 **비율 유지**, **HySpark 블루만** (빨강 CTA 금지)
+- 모바일 CTA: `min-height: 52px`, block 링크
+- 멤버 앱: 불필요한 시계 카드·장황한 히어로 제거, **한 화면**에 들어가게
+
+### H. 듀얼 포털 혼동
+- `npm run build`만 하고 끝 → 프로덕션 미반영 (`dist-member` / `dist-admin` 필요)
+- admin dev(5173)만 켜고 member UI 「안 보임」 보고 → 포털·빌드 타깃 먼저 확인
+- 상세: `dual-portal-delivery.mdc`
+
+## 3. 작업 완료 전 필수 체크 (배포·회고 공통)
+
+```
+[ ] 사용자 이번 턴에 명시한 항목 전부 구현됐는가
+[ ] 제거 요청(네트워킹, 시계 카드 등)만 제거됐는가 — 다른 요구는 남았는가
+[ ] emailHtmlTemplates.ts ↔ email-html-templates.ts diff 핵심 HTML 동일
+[ ] sessionVenue.ts ↔ session-venue.ts 동기화
+[ ] npm test 통과
+[ ] 4종 자동화 규칙 DB/UI 일치
+[ ] 메일 링크 intent=absence|checkin
+[ ] 자동·테스트·수동 발송 모두 실제 HTML 미리보기 있는가
+[ ] 배포 요청 있었는가 (없으면 deploy 하지 않음)
+[ ] member/admin 중 어느 포털 빌드·배포했는지 보고에 명시
+```
+
+## 4. 계정·URL 고정값
+
+- Admin: `https://hyspark-attendance-admin.web.app`
+- Member: `https://hyspark-attendance-member.web.app`
+- Firebase project: `pi-shirt`
+- Supabase ref: `lwbjprzrnmlnmzlxiwrv`
+- Gmail: `choimeans2@gmail.com`
+- 작업 디렉터리: `hyspark-attendence/` (스파크어탠던스_코드정리_20260610 하위)

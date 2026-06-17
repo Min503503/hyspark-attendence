@@ -1,0 +1,15 @@
+---
+description: HySpark 자동 발송 메일 — 세션 장소 카드 필수
+globs: src/lib/emailHtmlTemplates.ts,src/lib/sessionVenue.ts,supabase/functions/_shared/email-html-templates.ts,supabase/functions/_shared/session-venue.ts
+alwaysApply: false
+---
+
+# 이메일 세션 장소 카드
+
+5일 전 / 1일 전 / 출석 오픈 메일에는 **반드시** `세션 장소` 카드(`venueCard`)가 포함되어야 한다.
+
+- `venue_name`이 비어 있어도 카드를 숨기지 않는다 → `resolveVenueDisplayName()` 사용.
+- 본문에 “장소를 확인해 주세요”가 있으면 장소 카드는 **무조건** 렌더한다.
+- 장소가 있으면 `resolveVenueMapsUrl()`로 네이버 지도 링크(텍스트 링크)를 붙인다.
+- `src/lib/sessionVenue.ts`와 Deno 미러 `supabase/functions/_shared/session-venue.ts`를 함께 수정한다.
+- 변경 후 `src/test/emailHtmlTemplates.test.ts`에서 venue_name 없는 세션 케이스를 유지한다.

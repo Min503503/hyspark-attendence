@@ -1,0 +1,2 @@
+ALTER TABLE attendance_records DROP CONSTRAINT attendance_records_check_in_method_check;
+ALTER TABLE attendance_records ADD CONSTRAINT attendance_records_check_in_method_check CHECK (check_in_method = ANY (ARRAY['qr'::text, 'code'::text, 'manual'::text, 'auto'::text]));

@@ -1,0 +1,42 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-admin
+dist-member
+dist-ssr
+*.local
+.env
+.env.*
+!.env.example
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.vercel
+.firebase
+firebase-debug.log
+
+# Gmail OAuth (scripts/gmail)
+scripts/gmail/credentials.json
+scripts/gmail/token.json
+scripts/gmail/supabase-secrets.local.sh
+scripts/gmail/supabase-secrets.env
+scripts/.migration-export
+scripts/.migration-import-batches.json
+scripts/.migration-import-sql
+scripts/gmail/.venv

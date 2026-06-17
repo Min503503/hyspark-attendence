@@ -1,0 +1,31 @@
+---
+description: HySpark 수동 발송 메일 — HTML 틀 필수 + 서버/클라이언트 동기화
+globs: src/lib/emailHtmlTemplates.ts,supabase/functions/_shared/email-html-templates.ts,supabase/functions/send-member-email/**,src/pages/AdminEmail.tsx,src/pages/AdminMembers.tsx
+alwaysApply: false
+---
+
+# 수동 발송 메일
+
+## 요구사항
+
+- 수동 발송(AdminEmail 수동 탭, AdminMembers 메일 다이얼로그)은 **반드시** 표준 `emailShell` HTML 틀로 발송한다.
+- 본문 입력은 plain text; 발송 시 `buildManualEmailHtml()`로 래핑한다.
+- 제목 `[HySpark] 공지` → 카드 헤드라인은 `manualEmailHeadline()`으로 prefix 제거.
+
+## 구현 위치
+
+- 래핑은 `send-member-email` Edge Function에서 `manual: true`일 때 수행한다. **클라이언트만** 수정하지 않는다 (AdminMembers도 같은 API 사용).
+- 템플릿 함수는 **두 파일**에 동기화:
+  - `src/lib/emailHtmlTemplates.ts`
+  - `supabase/functions/_shared/email-html-templates.ts`
+
+## 배포
+
+- `send-member-email` 변경 후: `npm run gmail:deploy` (project-ref `lwbjprzrnmlnmzlxiwrv`)
+- 프론트 변경이 없으면 admin/member 재배포는 **불필요** — 사용자에게 명시한다.
+
+## 체크리스트
+
+- [ ] `manual: true` + Gmail `html: true`로 발송
+- [ ] 수신자별 `full_name` 인사 포함
+- [ ] `src/test/emailHtmlTemplates.test.ts` manual 케이스 유지

@@ -1,0 +1,36 @@
+---
+description: HySpark 전용 회고 보조 (전역 규칙은 ~/.cursor/rules 참고)
+alwaysApply: true
+---
+
+# HySpark — 프로젝트 전용 회고
+
+**전역 규칙:** `~/.cursor/rules/agent-retrospective-global.mdc`  
+**HySpark 상세:** `hyspark-session-retrospective.mdc`, `docs/AGENT_RETROSPECTIVE.md`
+
+## HySpark만 해당
+
+| 표현 | 의미 |
+|------|------|
+| 멤버칸 | `AdminMembers.tsx` 목록 행 — **인라인 입력** 우선 |
+| member / admin | `VITE_PORTAL` · `dist-member` / `dist-admin` · 각 web.app URL |
+
+## "안 보인다" (HySpark 순서)
+
+1. admin vs member dev (`npm run dev:admin` / `dev:member`)
+2. `npm run build`만 함 → Firebase는 `build:firebase` 필요
+3. `npm run deploy` 미실행
+4. 캐시
+
+→ 상세: `dual-portal-delivery.mdc`
+
+## Gmail + Supabase (HySpark)
+
+- 발신: `choimeans2@gmail.com` · Supabase ref: `lwbjprzrnmlnmzlxiwrv`
+- 변경 시: mail.ts + Edge Function + `scripts/gmail` + secrets + `functions deploy` **한 번에**
+- Gmail 계정 ≠ Supabase 로그인 계정
+
+## 이 세션 교훈
+
+- 멤버 이메일: 추가 폼만으로 부족 → 목록 **인라인 + blur 저장**
+- ㄱㄱㄱ → `npm run deploy`

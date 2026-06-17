@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "default": "pi-shirt"
+  },
+  "targets": {
+    "pi-shirt": {
+      "hosting": {
+        "admin": [
+          "hyspark-attendance-admin"
+        ],
+        "member": [
+          "hyspark-attendance-member"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

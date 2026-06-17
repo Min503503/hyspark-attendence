@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "pi-shirt"
+  },
+  "targets": {
+    "pi-shirt": {
+      "hosting": {
+        "hyspark-attendance": [
+          "hyspark-attendance"
+        ]
+      }
+    }
+  }
+}

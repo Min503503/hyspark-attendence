@@ -1,0 +1,179 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Navy-based palette */
+    --background: 36 33% 97%;       /* #F8F6F2 off-white */
+    --foreground: 214 60% 15%;      /* #1F2430 ink */
+
+    --card: 0 0% 100%;
+    --card-foreground: 214 60% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 214 60% 15%;
+
+    --primary: 213 61% 15%;         /* #10233D navy */
+    --primary-foreground: 36 33% 97%;
+
+    --secondary: 36 25% 93%;
+    --secondary-foreground: 214 60% 15%;
+
+    --muted: 36 20% 94%;
+    --muted-foreground: 214 15% 50%;
+
+    --accent: 88 100% 67%;          /* #B5FF5A lime */
+    --accent-foreground: 213 61% 15%;
+
+    --destructive: 8 100% 67%;      /* #FF6B57 coral */
+    --destructive-foreground: 0 0% 100%;
+
+    --warning: 38 91% 63%;          /* #F6B94B amber */
+    --warning-foreground: 213 61% 15%;
+
+    --success: 145 63% 42%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 88 100% 67%;
+
+    --radius: 0.625rem;
+
+    --sidebar-background: 213 61% 15%;
+    --sidebar-foreground: 36 33% 97%;
+    --sidebar-primary: 88 100% 67%;
+    --sidebar-primary-foreground: 213 61% 15%;
+    --sidebar-accent: 213 50% 22%;
+    --sidebar-accent-foreground: 36 33% 97%;
+    --sidebar-border: 213 40% 25%;
+    --sidebar-ring: 88 100% 67%;
+
+    /* Semantic status */
+    --status-present: 145 63% 42%;
+    --status-late: 38 91% 63%;
+    --status-absent: 8 100% 67%;
+    --status-excused: 214 15% 50%;
+
+    /* Risk */
+    --risk-stable: 145 63% 42%;
+    --risk-counseling: 38 91% 63%;
+    --risk-withdrawal: 8 100% 67%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold tracking-tight;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+}
+
+/* Subtle grid background */
+.bg-grid {
+  background-image:
+    linear-gradient(hsl(var(--border) / 0.4) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--border) / 0.4) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Soft gradient overlay */
+.bg-soft-gradient {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--background)) 0%,
+    hsl(36 30% 95%) 50%,
+    hsl(var(--background)) 100%
+  );
+}
+
+/* Scroll reveal animation */
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-reveal-up {
+  animation: reveal-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out both;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.animate-count-up {
+  animation: count-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Stagger children */
+.stagger-children > * {
+  animation: reveal-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 80ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 160ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 240ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 320ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 400ms; }
+.stagger-children > *:nth-child(7) { animation-delay: 480ms; }
+.stagger-children > *:nth-child(8) { animation-delay: 560ms; }
+
+/* Tabular nums for data */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}

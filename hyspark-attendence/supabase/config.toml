@@ -1,0 +1,13 @@
+project_id = "lwbjprzrnmlnmzlxiwrv"
+
+[functions.send-member-email]
+verify_jwt = false
+
+[functions.process-email-automation]
+verify_jwt = false
+
+[functions.auto-open-sessions]
+verify_jwt = false
+
+[functions.send-checkin-email]
+verify_jwt = false
