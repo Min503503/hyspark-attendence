@@ -58,76 +58,90 @@ export default function CampTimeSlotPicker({
     dragRef.current.active = false;
   };
 
-  const showHourLabel = (slot: string, index: number) => {
-    if (index === 0) return true;
-    const prev = parseTimeToMinutes(slots[index - 1]);
-    const curr = parseTimeToMinutes(slot);
-    if (prev === null || curr === null) return false;
-    return Math.floor(curr / 60) !== Math.floor(prev / 60);
-  };
+  // Group slots by 1 hour (00 min and 30 min)
+  const groupedSlots = [];
+  for (let i = 0; i < slots.length; i += 2) {
+    groupedSlots.push({
+      hour: slots[i].slice(0, 2),
+      slot00: slots[i],
+      slot30: slots[i + 1] as string | undefined,
+    });
+  }
 
   return (
-    <div className="space-y-2">
-      <p className="text-[11px] font-bold text-muted-foreground">
-        참여한 시간을 드래그해서 칠해 주세요 (30분 단위 · 끊어져도 OK)
+    <div className="space-y-3">
+      <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+        참여한 시간을 드래그하거나 탭해 주세요 (30분 단위)
       </p>
       <div
-        className="select-none overflow-hidden rounded-xl border border-border/60 bg-secondary/20"
+        className="select-none overflow-hidden rounded-2xl border border-border/45 bg-secondary/10 p-3.5 space-y-2.5"
         onPointerLeave={endPaint}
         onPointerUp={endPaint}
         onPointerCancel={endPaint}
       >
-        <div className="grid grid-cols-[2.75rem_1fr] gap-0">
-          {slots.map((slot, index) => {
-            const active = selectedSet.has(slot);
-            const hourLabel = showHourLabel(slot, index);
-            const minutePart = slot.slice(3, 5);
-            const isHourStart = minutePart === '00';
-            const hourDivider = isHourStart && index > 0;
+        {groupedSlots.map((group) => {
+          const active00 = selectedSet.has(group.slot00);
+          const active30 = group.slot30 ? selectedSet.has(group.slot30) : false;
 
-            return (
-              <div key={slot} className="contents">
-                <div
-                  className={cn(
-                    'flex items-center justify-end border-r border-border/40 px-2 text-[10px] font-bold tabular-nums text-muted-foreground',
-                    hourLabel ? 'pt-1' : 'py-0',
-                    hourDivider && 'border-t-2 border-t-foreground/30',
-                    !hourDivider && index > 0 && 'border-t border-t-border/25',
-                  )}
-                >
-                  {hourLabel ? (
-                    <span className="text-[11px] text-foreground/80">{slot.slice(0, 2)}시</span>
-                  ) : (
-                    <span className="text-[9px] opacity-50">{minutePart}</span>
-                  )}
-                </div>
+          return (
+            <div key={group.slot00} className="grid grid-cols-[2.75rem_1fr_1fr] items-center gap-2">
+              {/* Hour Label */}
+              <div className="text-right text-xs font-black text-foreground/70 pr-1.5 tabular-nums">
+                {group.hour}시
+              </div>
+
+              {/* 00 min Button */}
+              <button
+                type="button"
+                disabled={disabled}
+                onPointerDown={event => {
+                  event.preventDefault();
+                  beginPaint(group.slot00);
+                }}
+                onPointerEnter={() => continuePaint(group.slot00)}
+                className={cn(
+                  'h-10 rounded-xl border text-[11px] font-bold transition-all duration-200 touch-none flex items-center justify-center shadow-sm active:scale-[0.98]',
+                  active00
+                    ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white border-transparent ring-1 ring-blue-400/20'
+                    : 'bg-background/80 border-border/50 hover:bg-primary/5 hover:border-primary/20 text-foreground/75'
+                )}
+                aria-pressed={active00}
+                aria-label={`${group.slot00}–${formatMinutesToTime((parseTimeToMinutes(group.slot00) ?? 0) + CAMP_SLOT_MINUTES)} ${active00 ? '선택됨' : '선택 안 됨'}`}
+              >
+                00분 ~ 30분
+              </button>
+
+              {/* 30 min Button */}
+              {group.slot30 ? (
                 <button
                   type="button"
                   disabled={disabled}
                   onPointerDown={event => {
                     event.preventDefault();
-                    beginPaint(slot);
+                    beginPaint(group.slot30!);
                   }}
-                  onPointerEnter={() => continuePaint(slot)}
+                  onPointerEnter={() => continuePaint(group.slot30!)}
                   className={cn(
-                    'h-5 w-full transition-colors touch-none',
-                    hourDivider && 'border-t-2 border-t-foreground/30',
-                    !hourDivider && index > 0 && 'border-t border-t-border/25',
-                    active
-                      ? 'bg-primary hover:bg-primary/90'
-                      : 'bg-background/80 hover:bg-primary/15',
-                    index === slots.length - 1 && 'border-b border-b-border/40',
+                    'h-10 rounded-xl border text-[11px] font-bold transition-all duration-200 touch-none flex items-center justify-center shadow-sm active:scale-[0.98]',
+                    active30
+                      ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white border-transparent ring-1 ring-indigo-400/20'
+                      : 'bg-background/80 border-border/50 hover:bg-primary/5 hover:border-primary/20 text-foreground/75'
                   )}
-                  aria-pressed={active}
-                  aria-label={`${slot}–${formatMinutesToTime((parseTimeToMinutes(slot) ?? 0) + CAMP_SLOT_MINUTES)} ${active ? '선택됨' : '선택 안 됨'}`}
-                />
-              </div>
-            );
-          })}
-        </div>
+                  aria-pressed={active30}
+                  aria-label={`${group.slot30}–${formatMinutesToTime((parseTimeToMinutes(group.slot30) ?? 0) + CAMP_SLOT_MINUTES)} ${active30 ? '선택됨' : '선택 안 됨'}`}
+                >
+                  30분 ~ 00분
+                </button>
+              ) : (
+                <div />
+              )}
+            </div>
+          );
+        })}
       </div>
-      <p className="text-[10px] text-muted-foreground">
-        {openTime.slice(0, 5)}–{closeTime.slice(0, 5)} · 한 칸 = {CAMP_SLOT_MINUTES}분 · When2Meet처럼 드래그 가능
+      <p className="text-[10px] text-muted-foreground flex justify-between px-1">
+        <span>운영 시간: {openTime.slice(0, 5)} ~ {closeTime.slice(0, 5)}</span>
+        <span>한 칸 = {CAMP_SLOT_MINUTES}분 · 드래그 가능</span>
       </p>
     </div>
   );

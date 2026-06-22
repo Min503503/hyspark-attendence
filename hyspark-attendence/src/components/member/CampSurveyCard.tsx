@@ -159,17 +159,20 @@ export default function CampSurveyCard({ memberId, focusOnMount = false, onSaved
       title={camp.title}
       icon={Sparkles}
       description={`${camp.start_date} ~ ${camp.end_date} · 운영 ${camp.daily_open_time}-${camp.daily_close_time}`}
-      className={focusOnMount ? 'ring-2 ring-primary/30' : undefined}
+      className={cn(
+        'border border-white/20 bg-background/65 backdrop-blur-md shadow-2xl shadow-primary/5 rounded-3xl p-5 transition-all duration-300',
+        focusOnMount && 'ring-2 ring-primary/40 shadow-primary/10'
+      )}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <p className="text-sm text-muted-foreground leading-relaxed">
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
           오늘 캠프 참여 여부를 알려주세요.
-          참여하신 경우 <strong className="text-foreground">있었던 시간</strong>을 드래그해서 칠해 주세요.
+          참여하신 경우 <strong className="text-foreground font-black">있었던 시간</strong>을 드래그해서 칠해 주세요.
           (12–1시, 2–5시처럼 끊어져 있어도 됩니다.)
-          참여 {CAMP_DEMERIT_OFFSET.hours_per_block}시간마다 벌점 {CAMP_DEMERIT_OFFSET.credit_per_block}점이 상쇄됩니다.
+          참여 {CAMP_DEMERIT_OFFSET.hours_per_block}시간마다 벌점 <span className="text-blue-600 font-extrabold">{CAMP_DEMERIT_OFFSET.credit_per_block}점</span>이 상쇄됩니다.
         </p>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2.5">
           {([
             { value: 'attended' as const, label: '참여함' },
             { value: 'absent' as const, label: '오늘 출석 안 함' },
@@ -179,10 +182,10 @@ export default function CampSurveyCard({ memberId, focusOnMount = false, onSaved
               type="button"
               onClick={() => setMode(option.value)}
               className={cn(
-                'rounded-xl border px-3 py-3 text-sm font-bold transition-colors',
+                'rounded-xl border-2 px-3 py-3 text-xs sm:text-sm font-black transition-all duration-300 ease-out active:scale-[0.97]',
                 mode === option.value
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-border/60 bg-secondary/30 text-muted-foreground',
+                  ? 'border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/15'
+                  : 'border-border/40 bg-secondary/35 text-muted-foreground hover:bg-secondary/55 hover:text-foreground',
               )}
             >
               {option.label}
@@ -199,24 +202,24 @@ export default function CampSurveyCard({ memberId, focusOnMount = false, onSaved
             disabled={submitting}
           />
         ) : (
-          <div className="rounded-xl border border-border/60 bg-secondary/30 px-3 py-3 text-sm text-muted-foreground">
+          <div className="rounded-2xl border border-dashed border-border/80 bg-secondary/20 px-4 py-4 text-xs sm:text-sm text-muted-foreground text-center">
             오늘은 캠프에 참여하지 않았습니다. 벌점 상쇄는 적용되지 않습니다.
           </div>
         )}
 
         {mode === 'attended' && previewMinutes > 0 && (
-          <div className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm">
-            <div className="flex items-center gap-2 font-semibold text-primary">
-              <Clock className="h-4 w-4" />
+          <div className="rounded-2xl border border-blue-500/15 bg-gradient-to-r from-blue-500/5 to-indigo-500/5 px-4 py-3.5 text-xs sm:text-sm shadow-inner transition-all duration-300">
+            <div className="flex items-center gap-2.5 font-bold text-blue-600">
+              <Clock className="h-4 w-4 text-blue-500" />
               오늘 {formatCampDuration(previewMinutes)} 참여 ({selectedSlots.length * CAMP_SLOT_MINUTES}분)
             </div>
             <p className="mt-1 text-muted-foreground">
-              벌점 <strong className="text-foreground">{previewCredit.toFixed(2)}점</strong> 상쇄 예정
+              벌점 <strong className="text-foreground text-blue-600 font-extrabold">{previewCredit.toFixed(2)}점</strong> 상쇄 예정
             </p>
           </div>
         )}
 
-        <div className="sticky bottom-0 z-10 -mx-5 space-y-2 border-t border-border/60 bg-background/95 px-5 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/85 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="sticky bottom-0 z-10 -mx-5 space-y-2 border-t border-border/45 bg-background/95 px-5 py-3.5 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {context.today && (
             <p className="text-center text-[10px] text-muted-foreground">
               마지막 제출: {new Date(context.today.submitted_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
@@ -224,7 +227,16 @@ export default function CampSurveyCard({ memberId, focusOnMount = false, onSaved
             </p>
           )}
 
-          <Button type="submit" disabled={submitting} className="h-12 w-full text-base font-bold shadow-sm">
+          <Button 
+            type="submit" 
+            disabled={submitting} 
+            className={cn(
+              "h-12 w-full text-sm sm:text-base font-black shadow-md transition-all duration-200",
+              mode === 'absent'
+                ? "bg-muted-foreground hover:bg-muted-foreground/90 text-white"
+                : "bg-primary hover:bg-primary/95 text-primary-foreground"
+            )}
+          >
             {submitting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : mode === 'absent' ? (
