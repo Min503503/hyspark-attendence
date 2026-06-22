@@ -138,31 +138,43 @@ Deno.serve(async (req) => {
             checkInLink: memberPortalUrl("checkin", { token: portalToken }),
           });
 
-          try {
-            const result = await sendGmail(accessToken, from, profile.email!, subject, html, { html: true });
-            await supabase.from("email_send_logs").insert({
+          // Pre-insert log with 'sent' status to acquire UNIQUE key lock
+          const { error: lockError } = await supabase
+            .from("email_send_logs")
+            .insert({
               rule_id: rule.id,
               session_id: session.id,
               profile_id: profile.id,
               email: profile.email,
               subject,
               status: "sent",
-              message_id: result.id,
               dedupe_key: dedupeKey,
             });
+
+          if (lockError) {
+            // If another instance inserted the log concurrently, skip this send
+            skipped++;
+            continue;
+          }
+
+          try {
+            const result = await sendGmail(accessToken, from, profile.email!, subject, html, { html: true });
+            if (result?.id) {
+              await supabase
+                .from("email_send_logs")
+                .update({ message_id: result.id })
+                .eq("dedupe_key", dedupeKey);
+            }
             sent++;
           } catch (err) {
             const message = err instanceof Error ? err.message : "send failed";
-            await supabase.from("email_send_logs").insert({
-              rule_id: rule.id,
-              session_id: session.id,
-              profile_id: profile.id,
-              email: profile.email,
-              subject,
-              status: "failed",
-              error_message: message,
-              dedupe_key: dedupeKey,
-            });
+            await supabase
+              .from("email_send_logs")
+              .update({
+                status: "failed",
+                error_message: message,
+              })
+              .eq("dedupe_key", dedupeKey);
             failed++;
           }
         }
