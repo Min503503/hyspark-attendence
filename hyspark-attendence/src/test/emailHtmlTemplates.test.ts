@@ -35,8 +35,8 @@ describe('emailHtmlTemplates', () => {
     expect(html).toContain('네이버 지도에서 보기');
     expect(html).toContain('세션 장소');
     expect(html).toMatch(/일시[\s\S]*세션 장소[\s\S]*출석 오픈/);
-    expect(html).toContain('font-weight:800');
-    expect(html).not.toContain('font-size:22px');
+    expect(html).toContain('font-weight:700');
+    expect(html).toContain('border-top:3px solid');
     expect(html).toContain(SAMPLE_EMAIL_DATA.session_reminder_5d.absenceLink!);
     expect(html).toContain(SAMPLE_EMAIL_DATA.session_reminder_5d.venueMapsUrl!);
     expect(html).toContain(SAMPLE_EMAIL_DATA.session_reminder_5d.venueName!);
@@ -112,10 +112,10 @@ describe('emailHtmlTemplates', () => {
   });
 
   it('CTA 버튼: 모바일 터치 영역 확보', () => {
-    const html = buildEmailHtml('session_reminder_5d', SAMPLE_EMAIL_DATA.session_reminder_5d);
+    const html = buildEmailHtml('session_open', SAMPLE_EMAIL_DATA.session_open);
     expect(html).toContain('min-height:52px');
     expect(html).toContain('class="email-btn"');
-    expect(html).not.toContain('<span style="color:#ffffff;">미리 결석 신청하기</span>');
+    expect(html).not.toContain('<span style="color:#ffffff;">바로 출석체크하기</span>');
   });
 
   it('체크인 완료: 시간·결과 표시', () => {
@@ -172,6 +172,7 @@ describe('emailHtmlTemplates', () => {
     expect(html).toContain('학회 일정이 변경되었습니다.');
     expect(html).toContain('자세한 내용은 카톡을 확인해 주세요.');
     expect(html).toContain(PUBLIC_URLS.emailLogo);
+    expect(html).toContain('발신 전용');
     expect(html).toContain('HySpark Attendance');
   });
 });
