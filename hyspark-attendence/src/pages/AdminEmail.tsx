@@ -59,7 +59,7 @@ const TEST_KINDS: EmailTemplateKind[] = [
 
 function injectPreviewLogo(html: string) {
   if (typeof window === 'undefined') return html;
-  const logoUrl = `${window.location.origin}/hyspark-logo.png`;
+  const logoUrl = `${window.location.origin}/hyspark-email-logo.png`;
   return html.replaceAll(PUBLIC_URLS.emailLogo, logoUrl);
 }
 

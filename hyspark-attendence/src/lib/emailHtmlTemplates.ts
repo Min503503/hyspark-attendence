@@ -47,11 +47,11 @@ export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatusLabel, string> = {
   unexcused_absent: '결석',
 };
 
-/** 메일 헤더 워드마크 448×146 — width만 지정, height auto */
-const LOGO_NATURAL_WIDTH = 448;
-const LOGO_NATURAL_HEIGHT = 146;
-const LOGO_DISPLAY_WIDTH = 154;
-const LOGO_DISPLAY_HEIGHT = Math.round((LOGO_DISPLAY_WIDTH * LOGO_NATURAL_HEIGHT) / LOGO_NATURAL_WIDTH);
+/** 메일 헤더 — 스파크 아이콘 212×107, width만 지정 */
+const LOGO_NATURAL_WIDTH = 212;
+const LOGO_NATURAL_HEIGHT = 107;
+const LOGO_DISPLAY_HEIGHT = 34;
+const LOGO_DISPLAY_WIDTH = Math.round((LOGO_DISPLAY_HEIGHT * LOGO_NATURAL_WIDTH) / LOGO_NATURAL_HEIGHT);
 
 function brandLogoImg(logoUrl: string) {
   return `<img src="${escapeHtml(logoUrl)}" alt="하이스파크" width="${LOGO_DISPLAY_WIDTH}" height="${LOGO_DISPLAY_HEIGHT}" border="0" style="display:block;width:${LOGO_DISPLAY_WIDTH}px;max-width:100%;height:auto;border:0;outline:none;line-height:100%;-ms-interpolation-mode:bicubic;" />`;

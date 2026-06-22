@@ -24,7 +24,7 @@ describe('emailHtmlTemplates', () => {
   it('uses a reachable logo URL', () => {
     const html = buildEmailHtml('session_reminder_5d', SAMPLE_EMAIL_DATA.session_reminder_5d);
     expect(html).toContain(PUBLIC_URLS.emailLogo);
-    expect(html).toContain('supabase.co/storage/v1/object/public/brand-assets/hyspark-logo.png');
+    expect(html).toContain('supabase.co/storage/v1/object/public/brand-assets/hyspark-email-logo.png');
     expect(html).not.toContain('hyspark-attendance-admin.web.app/hyspark-logo.png');
     expect(html).not.toContain('hyspark-attendance-member.web.app/hyspark-logo.png');
   });

@@ -7,9 +7,9 @@ export const PUBLIC_URLS = {
   member: 'https://hysparkpre-member.web.app',
   about: 'https://hysparkpre-member.web.app/about.html',
   privacy: 'https://hysparkpre-member.web.app/privacy.html',
-  /** Supabase Storage — 메일 헤더 워드마크 (키다리은행형) */
+  /** Supabase Storage — 메일 헤더 스파크 아이콘 (텍스트 없음) */
   emailLogo:
-    'https://lwbjprzrnmlnmzlxiwrv.supabase.co/storage/v1/object/public/brand-assets/hyspark-logo.png',
+    'https://lwbjprzrnmlnmzlxiwrv.supabase.co/storage/v1/object/public/brand-assets/hyspark-email-logo.png',
 } as const;
 
 export type MemberPortalIntent = 'absence' | 'checkin' | 'camp-survey';
