@@ -59,5 +59,6 @@
 
 - 전역: `~/.cursor/rules/cross-tool-version-control.mdc`
 - HySpark: `.cursor/rules/cross-tool-git.mdc` · `docs/CROSS_TOOL_GIT.md`
-- Antigravity 프롬프트: `Documents/docs/CROSS_TOOL_GIT.md` 하단 블록 복사
-- **끝:** commit → (요청 시) push · **시작:** `git pull` · **push ≠ Firebase/Edge 배포**
+- Antigravity 프롬프트: `Documents/docs/CROSS_TOOL_GIT.md`
+- **세션 종료 시 자동 commit + push** (「커밋하지마」 등 예외)
+- **push ≠ Firebase/Edge 배포**

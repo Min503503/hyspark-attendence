@@ -7,21 +7,26 @@ alwaysApply: true
 
 전역: `~/.cursor/rules/cross-tool-version-control.mdc` · 상세: `docs/CROSS_TOOL_GIT.md`
 
+## 자동 Git (세션 종료 시)
+
+파일을 수정한 작업이 끝나면 **자동** `commit` + `push origin main` (전역 규칙).  
+Git 명령은 repo 루트 **`HySpark Attendence/`** 에서 실행 (`hyspark-attendence/...` 경로로 스테이징).
+
 ## 이 repo만
 
 | 항목 | 값 |
 |------|-----|
-| Git 루트 | 상위 `HySpark Attendence/` (커밋 경로 `hyspark-attendence/...`) |
-| **작업·빌드·배포** | **`hyspark-attendence/`** 만 (`archive/` 수정·배포 금지) |
+| Git 루트 | 상위 `HySpark Attendence/` |
+| **작업·빌드·배포** | **`hyspark-attendence/`** 만 (`archive/` 금지) |
 | 기본 브랜치 | `main` → `origin/main` |
 
 ## push 후에도 따로 필요한 것
 
-- 프론트: `npm run deploy` / `deploy:admin` / `deploy:member` (Firebase `dist-member` · `dist-admin`)
-- Edge·Gmail: `npm run gmail:deploy` 또는 `supabase functions deploy … --project-ref lwbjprzrnmlnmzlxiwrv`
-- DB: `supabase db push` (마이그레이션 변경 시)
+- 프론트: `npm run deploy` / `deploy:admin` / `deploy:member`
+- Edge·Gmail: `npm run gmail:deploy` · ref `lwbjprzrnmlnmzlxiwrv`
+- DB: `supabase db push`
 
-완료 보고: Admin URL · Member URL · Git push 여부 · Firebase/Edge 배포 여부 **분리 표기**.
+완료 보고: Admin/Member URL · **Git push** · **Firebase/Edge 배포** 분리 표기.
 
 ## 제외 (커밋하지 않음)
 

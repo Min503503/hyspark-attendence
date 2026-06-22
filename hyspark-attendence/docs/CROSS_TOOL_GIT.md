@@ -1,14 +1,15 @@
 # Cross-tool Git (Cursor · Antigravity)
 
-전역 문서( Antigravity 붙여넣기 프롬프트 포함 ):  
-**[/Users/choiminsoo/Documents/docs/CROSS_TOOL_GIT.md](/Users/choiminsoo/Documents/docs/CROSS_TOOL_GIT.md)**
+**정책:** 작업으로 파일이 바뀌면 세션 종료 시 **자동 commit + push** (`main`).
 
-## HySpark 요약
+전역·Antigravity 프롬프트: `/Users/choiminsoo/Documents/docs/CROSS_TOOL_GIT.md`
 
-- **Git 루트:** 상위 `HySpark Attendence/`
-- **작업 디렉터리:** `hyspark-attendence/`
-- **끝날 때:** commit → (요청 시) `git push origin main`
-- **시작할 때:** `git pull origin main`
-- **push ≠ 배포:** `npm run deploy` · `gmail:deploy` 별도
+## HySpark
 
-Cursor 규칙: `.cursor/rules/cross-tool-git.mdc`
+- Git 루트: 상위 `HySpark Attendence/` (명령은 루트에서)
+- 작업: `hyspark-attendence/` only
+- push ≠ `npm run deploy` / `gmail:deploy`
+
+Cursor: `.cursor/rules/cross-tool-git.mdc`
+
+**예외:** 「커밋하지마」「잠만」, 변경 없음, pull 충돌
