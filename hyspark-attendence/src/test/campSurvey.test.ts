@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCampTimeSlots,
+  buildCampWeekdays,
   CAMP_SLOT_MINUTES,
   computeCampDurationFromSlots,
   expandCampResponseToSlots,
   formatCampTimeSlotsSummary,
+  pickDefaultCampSurveyDate,
 } from '@/lib/campSurvey';
 
 describe('campSurvey time slots', () => {
@@ -25,5 +27,24 @@ describe('campSurvey time slots', () => {
   it('expandCampResponseToSlots restores legacy continuous range', () => {
     const slots = expandCampResponseToSlots('10:00', '11:30', '10:00', '22:00');
     expect(slots).toEqual(['10:00', '10:30', '11:00']);
+  });
+
+  it('buildCampWeekdays: Mon–Fri only within range', () => {
+    expect(buildCampWeekdays('2026-06-22', '2026-06-26')).toEqual([
+      '2026-06-22',
+      '2026-06-23',
+      '2026-06-24',
+      '2026-06-25',
+      '2026-06-26',
+    ]);
+  });
+
+  it('pickDefaultCampSurveyDate prefers today when eligible', () => {
+    const days = buildCampWeekdays('2026-06-22', '2026-06-26').map(date => ({
+      date,
+      weekday_label: '월',
+    }));
+    expect(pickDefaultCampSurveyDate(days, '2026-06-24')).toBe('2026-06-24');
+    expect(pickDefaultCampSurveyDate(days, '2026-06-28')).toBe('2026-06-26');
   });
 });

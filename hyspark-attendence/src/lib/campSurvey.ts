@@ -23,10 +23,71 @@ export interface CampDailyResponse {
   submitted_at: string;
 }
 
+export interface CampSurveyDay {
+  date: string;
+  weekday_label: string;
+  response?: CampDailyResponse | null;
+}
+
 export interface CampSurveyContext {
   active: boolean;
+  today_kst?: string;
   camp?: CampSettings;
+  days?: CampSurveyDay[];
+  /** @deprecated use days[].response for selected date */
   today?: CampDailyResponse | null;
+}
+
+/** 캠프 기간 내 평일(월~금) 목록 — 클라이언트 미리보기용 */
+export function buildCampWeekdays(startDate: string, endDate: string): string[] {
+  const dates: string[] = [];
+  const start = new Date(`${startDate}T12:00:00+09:00`);
+  const end = new Date(`${endDate}T12:00:00+09:00`);
+  for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+    const dow = cursor.getDay();
+    if (dow >= 1 && dow <= 5) {
+      const y = cursor.getFullYear();
+      const m = String(cursor.getMonth() + 1).padStart(2, '0');
+      const d = String(cursor.getDate()).padStart(2, '0');
+      dates.push(`${y}-${m}-${d}`);
+    }
+  }
+  return dates;
+}
+
+export function formatCampDayShort(date: string): string {
+  const [, month, day] = date.split('-');
+  return `${Number(month)}/${Number(day)}`;
+}
+
+/** 기본 선택일: 오늘(캠프 평일·제출 가능) → 없으면 가장 최근 제출 가능일 */
+export function pickDefaultCampSurveyDate(days: CampSurveyDay[], todayKst: string): string {
+  const eligible = days.filter(day => day.date <= todayKst);
+  if (eligible.length === 0) return days[0]?.date ?? todayKst;
+  const todayMatch = eligible.find(day => day.date === todayKst);
+  if (todayMatch) return todayMatch.date;
+  return eligible[eligible.length - 1].date;
+}
+
+export function applyCampDayResponse(
+  day: CampSurveyDay | undefined,
+  camp: CampSettings,
+): { mode: 'attended' | 'absent'; slots: string[] } {
+  if (!day?.response) {
+    return { mode: 'attended', slots: [] };
+  }
+  if (day.response.attended === false) {
+    return { mode: 'absent', slots: [] };
+  }
+  const slots = day.response.time_slots?.length
+    ? day.response.time_slots
+    : expandCampResponseToSlots(
+      day.response.from_time,
+      day.response.to_time,
+      camp.daily_open_time,
+      camp.daily_close_time,
+    );
+  return { mode: 'attended', slots };
 }
 
 export function parseTimeToMinutes(value: string): number | null {
