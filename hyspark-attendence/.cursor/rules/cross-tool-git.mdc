@@ -1,0 +1,28 @@
+---
+description: HySpark — Cursor↔Antigravity Git 핸드오프 (듀얼 포털·Edge 배포 구분)
+alwaysApply: true
+---
+
+# HySpark Cross-tool Git
+
+전역: `~/.cursor/rules/cross-tool-version-control.mdc` · 상세: `docs/CROSS_TOOL_GIT.md`
+
+## 이 repo만
+
+| 항목 | 값 |
+|------|-----|
+| Git 루트 | 상위 `HySpark Attendence/` (커밋 경로 `hyspark-attendence/...`) |
+| **작업·빌드·배포** | **`hyspark-attendence/`** 만 (`archive/` 수정·배포 금지) |
+| 기본 브랜치 | `main` → `origin/main` |
+
+## push 후에도 따로 필요한 것
+
+- 프론트: `npm run deploy` / `deploy:admin` / `deploy:member` (Firebase `dist-member` · `dist-admin`)
+- Edge·Gmail: `npm run gmail:deploy` 또는 `supabase functions deploy … --project-ref lwbjprzrnmlnmzlxiwrv`
+- DB: `supabase db push` (마이그레이션 변경 시)
+
+완료 보고: Admin URL · Member URL · Git push 여부 · Firebase/Edge 배포 여부 **분리 표기**.
+
+## 제외 (커밋하지 않음)
+
+`.env`, `scripts/gmail/supabase-secrets.env`, `.cursor/debug*.log`, `dist-*`, `node_modules`

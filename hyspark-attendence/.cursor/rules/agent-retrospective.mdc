@@ -6,7 +6,7 @@ alwaysApply: true
 # HySpark — 프로젝트 전용 회고
 
 **전역 규칙:** `~/.cursor/rules/agent-retrospective-global.mdc`  
-**HySpark 상세:** `hyspark-session-retrospective.mdc`, `docs/AGENT_RETROSPECTIVE.md`
+**HySpark 상세:** `hyspark-session-retrospective.mdc`, `cross-tool-git.mdc`, `docs/AGENT_RETROSPECTIVE.md`
 
 ## HySpark만 해당
 

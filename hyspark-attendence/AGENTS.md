@@ -5,7 +5,7 @@
 | 범위 | 위치 |
 |------|------|
 | **모든 프로젝트** | `~/.cursor/rules/` (4개 alwaysApply) · `/Users/choiminsoo/Documents/docs/AGENT_RETROSPECTIVE_GLOBAL.md` · `Documents/AGENTS.md` |
-| **HySpark 전용** | `.cursor/rules/agent-retrospective.mdc`, `hyspark-session-retrospective.mdc`, `docs/AGENT_RETROSPECTIVE.md` |
+| **HySpark 전용** | `.cursor/rules/agent-retrospective.mdc`, `hyspark-session-retrospective.mdc`, `cross-tool-git.mdc`, `docs/AGENT_RETROSPECTIVE.md` |
 
 **HySpark 핵심:** 4종 자동화 · 장소 카드 · 프론트↔엣지 메일 동기화 · `intent=absence|checkin` · 배포 명시 요청 후
 
@@ -54,3 +54,10 @@
 - admin dev 서버(5173 등)만 켜진 상태에서 member UI가 “안 보인다”고 하면, 포털 혼동부터 점검한다.
 
 자세한 체크리스트: `.cursor/rules/dual-portal-delivery.mdc`
+
+## Cursor ↔ Antigravity Git
+
+- 전역: `~/.cursor/rules/cross-tool-version-control.mdc`
+- HySpark: `.cursor/rules/cross-tool-git.mdc` · `docs/CROSS_TOOL_GIT.md`
+- Antigravity 프롬프트: `Documents/docs/CROSS_TOOL_GIT.md` 하단 블록 복사
+- **끝:** commit → (요청 시) push · **시작:** `git pull` · **push ≠ Firebase/Edge 배포**
