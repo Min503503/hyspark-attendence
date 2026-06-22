@@ -204,7 +204,7 @@ function subtitleLine(text: string) {
 function bulletList(items: string[]) {
   return items.map(item =>
     `<p style="margin:0 0 6px;font-family:${FONT_STACK};font-size:14px;line-height:1.55;color:${C.caption};letter-spacing:-0.01em;">· ${escapeHtml(item)}</p>`,
-  ).join('");
+  ).join('');
 }
 
 function primaryButton(href: string, label: string) {
@@ -261,10 +261,10 @@ function infoTable(rows: Array<{ label: string; value?: string; valueHtml?: stri
       <td valign="middle" style="padding:14px 16px;background:${C.cardBg};border-bottom:${index < rows.length - 1 ? `1px solid ${C.border}` : 'none'};">
         ${row.valueHtml
           ? `<div style="line-height:1.5;">${row.valueHtml}</div>`
-          : `<div style="font-family:${FONT_STACK};font-size:15px;font-weight:700;line-height:1.5;color:${row.accent || C.title};letter-spacing:-0.02em;">${escapeHtml(row.value || '")}</div>`
+          : `<div style="font-family:${FONT_STACK};font-size:15px;font-weight:700;line-height:1.5;color:${row.accent || C.title};letter-spacing:-0.02em;">${escapeHtml(row.value || '')}</div>`
         }
       </td>
-    </tr>`).join('");
+    </tr>`).join('');
 
   return `
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:24px 0;border-collapse:collapse;border-top:3px solid ${C.tableFrame};border-bottom:3px solid ${C.tableFrame};">
@@ -346,21 +346,21 @@ function buildSessionReminderHtml(data: EmailTemplateData, daysBefore: 5 | 1) {
     salutation: data.memberName,
     body: [
       bodyText(leadText),
-      bodyText('아래 일정과 장소를 확인해 주세요."),
+      bodyText('아래 일정과 장소를 확인해 주세요.'),
       infoTable([
         { label: '세션', value: data.sessionTitle },
         { label: '일시', value: data.sessionDateTime },
         sessionVenueRow(data.venueName, data.venueMapsUrl),
         { label: '출석 오픈', value: `세션 시작 ${data.checkInOpenMinutes ?? 15}분 전` },
       ]),
-      bodyText('이번 주에 결석 예정이신 분들은 출결 사이트에서 미리 등록해 주세요."),
+      bodyText('이번 주에 결석 예정이신 분들은 출결 사이트에서 미리 등록해 주세요.'),
       bulletList([
         '결석 신청은 세션 시작 전까지 가능합니다.',
         '당일 불참 시에도 반드시 사전에 등록해 주세요.',
       ]),
-      textLink(absenceLink, '미리 결석 신청하기"),
+      textLink(absenceLink, '미리 결석 신청하기'),
       fallbackLink(absenceLink),
-    ].filter(Boolean).join('"),
+    ].filter(Boolean).join(''),
   });
 }
 
