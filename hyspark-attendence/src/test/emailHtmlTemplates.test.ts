@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   SAMPLE_EMAIL_DATA,
+  buildCampSurveyReminderEmail,
   buildEmailFromSession,
   buildEmailHtml,
   buildEmailSubject,
@@ -23,6 +24,8 @@ describe('emailHtmlTemplates', () => {
   it('uses a reachable logo URL', () => {
     const html = buildEmailHtml('session_reminder_5d', SAMPLE_EMAIL_DATA.session_reminder_5d);
     expect(html).toContain(PUBLIC_URLS.emailLogo);
+    expect(html).toContain('supabase.co/storage/v1/object/public/brand-assets/hyspark-logo.png');
+    expect(html).not.toContain('hyspark-attendance-admin.web.app/hyspark-logo.png');
     expect(html).not.toContain('hyspark-attendance-member.web.app/hyspark-logo.png');
   });
 
@@ -60,6 +63,40 @@ describe('emailHtmlTemplates', () => {
     expect(html).toContain('미리 결석 신청하기');
     expect(html).toContain('intent=absence');
     expect(html).not.toContain('/#/member');
+  });
+
+  it('개인화 링크: m= 토큰이 absence/checkin CTA에 포함', () => {
+    const token = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    const absenceLink = memberPortalUrl('absence', { token });
+    const checkInLink = memberPortalUrl('checkin', { token });
+    const { html } = buildEmailFromSession(
+      'session_reminder_1d',
+      { full_name: '테스트' },
+      {
+        title: '6/27 13주차',
+        start_at: '2026-06-27T15:00:00+09:00',
+        check_in_open_minutes: 15,
+      },
+      { absenceLink, checkInLink },
+    );
+    expect(absenceLink).toContain(`m=${token}`);
+    expect(html).toContain(`m=${token}`);
+    expect(html).toContain('intent=absence');
+  });
+
+  it('캠프 설문 개인화 링크: campSurveyLink에 m= 포함', () => {
+    const token = '11111111-2222-3333-4444-555555555555';
+    const campSurveyLink = memberPortalUrl('camp-survey', { token });
+    const { html } = buildCampSurveyReminderEmail({
+      memberName: '테스트',
+      campTitle: '미니 스타트업 캠프',
+      campDateRange: '6/22 ~ 6/26',
+      todayLabel: '2026년 6월 20일 (토)',
+      campSurveyLink,
+    });
+    expect(campSurveyLink).toContain(`m=${token}`);
+    expect(html).toContain(`m=${token}`);
+    expect(html).toContain('intent=camp-survey');
   });
 
   it('출석 오픈: 출석 코드 미노출 + 체크인 버튼', () => {
@@ -114,6 +151,14 @@ describe('emailHtmlTemplates', () => {
   it('subjects are generated per kind', () => {
     expect(buildEmailSubject('session_open', SAMPLE_EMAIL_DATA.session_open)).toContain('출석체크');
     expect(buildEmailSubject('checkin_complete', SAMPLE_EMAIL_DATA.checkin_complete)).toContain('출석 완료');
+  });
+
+  it('캠프 일일 설문: 참여 시간 입력 링크', () => {
+    const html = buildEmailHtml('camp_daily_survey_reminder', SAMPLE_EMAIL_DATA.camp_daily_survey_reminder);
+    expect(html).toContain('참여 시간 입력하기');
+    expect(html).toContain('intent=camp-survey');
+    expect(html).not.toContain('/#/member');
+    expect(buildEmailSubject('camp_daily_survey_reminder', SAMPLE_EMAIL_DATA.camp_daily_survey_reminder)).toContain('캠프');
   });
 
   it('manual email: wraps plain text in the standard shell', () => {

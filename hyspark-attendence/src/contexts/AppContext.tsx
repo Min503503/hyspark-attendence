@@ -1,14 +1,28 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
-import type { Role, Profile, MemberWithSummary, Session, AttendanceRecord, Cohort, AttendanceStatus, MemberSummary, CheckInMethod, AttendanceCodeStatus, SessionStatus } from '@/types';
-import { getDemeritPoints, getRiskState } from '@/types';
+import type { Role, Profile, MemberWithSummary, Session, AttendanceRecord, AttendanceStatus, MemberSummary, CheckInMethod, AttendanceCodeStatus, SessionStatus, CampDemeritEntry } from '@/types';
+import { getRiskState } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
+import { adminApi, clearAdminToken } from '@/lib/adminApi';
+
+export const MEMBER_SESSION_KEY = 'hyspark_member_id';
+
+function persistMemberSession(profileId: string) {
+  if (typeof window !== 'undefined') {
+    sessionStorage.setItem(MEMBER_SESSION_KEY, profileId);
+  }
+}
+
+function clearMemberSession() {
+  if (typeof window !== 'undefined') {
+    sessionStorage.removeItem(MEMBER_SESSION_KEY);
+  }
+}
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type SessionRow = Database['public']['Tables']['sessions']['Row'];
 type AttendanceRecordRow = Database['public']['Tables']['attendance_records']['Row'];
-type CohortRow = Database['public']['Tables']['cohorts']['Row'];
 
 function mapProfile(row: ProfileRow): Profile {
   return {
@@ -72,15 +86,6 @@ function mapAttendanceRecord(row: AttendanceRecordRow): AttendanceRecord {
   };
 }
 
-function mapCohort(row: CohortRow): Cohort {
-  return {
-    id: row.id,
-    name: row.name,
-    season_label: row.season_label || '',
-    is_active: row.is_active,
-  };
-}
-
 interface AppState {
   currentUser: Profile | null;
   currentRole: Role | null;
@@ -88,11 +93,13 @@ interface AppState {
   members: MemberWithSummary[];
   sessions: Session[];
   attendanceRecords: AttendanceRecord[];
-  cohorts: Cohort[];
-  loading: boolean;
+  campResponses: CampDemeritEntry[];
+  campResponsesByMember: Record<string, CampDemeritEntry[]>;
   // Auth
-  loginAsAdmin: (email: string, password: string) => Promise<boolean>;
+  unlockAdminConsole: () => void;
   loginAsMember: (name: string) => Promise<MemberWithSummary | null>;
+  loginAsMemberById: (profileId: string) => Promise<MemberWithSummary | null>;
+  resolveAndLoginWithPortalToken: (token: string) => Promise<MemberWithSummary | null>;
   logout: () => void;
   // Session actions
   openCheckIn: (sessionId: string) => Promise<void>;
@@ -110,25 +117,59 @@ interface AppState {
   addMember: (data: { full_name: string; cohort_label: string; email?: string }) => Promise<void>;
   updateMember: (id: string, data: { full_name: string; cohort_label: string; status: 'active' | 'inactive'; email?: string }) => Promise<void>;
   deleteMember: (id: string) => Promise<boolean>;
-  addStaffProfile: (data: { full_name: string; role: 'admin' | 'staff'; email?: string; phone?: string }) => Promise<boolean>;
-  updateStaffProfile: (id: string, data: { full_name: string; role: 'admin' | 'staff'; status: 'active' | 'inactive'; email?: string; phone?: string }) => Promise<boolean>;
-  deleteStaffProfile: (id: string) => Promise<boolean>;
   // Manual attendance
   addManualRecord: (sessionId: string, memberId: string, status: AttendanceStatus) => Promise<void>;
-  submitAbsenceRequest: (sessionId: string, memberId: string, status: 'excused_absent' | 'unexcused_absent', category?: string, note?: string) => Promise<void>;
+  submitAbsenceRequest: (sessionId: string, memberId: string, status: 'excused_absent' | 'unexcused_absent', category?: string, note?: string) => Promise<boolean>;
   // Refresh
   refreshData: () => Promise<void>;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
 
-function computeMemberSummary(memberId: string, records: AttendanceRecord[]): MemberSummary {
+function computeMemberSummary(
+  memberId: string,
+  records: AttendanceRecord[],
+  campEntries: CampDemeritEntry[] = [],
+): MemberSummary {
   const memberRecords = records.filter(r => r.member_id === memberId);
   const present = memberRecords.filter(r => r.status === 'present').length;
   const late = memberRecords.filter(r => r.status === 'late').length;
   const absent = memberRecords.filter(r => r.status === 'absent' || r.status === 'unexcused_absent' || r.status === 'excused_absent').length;
-  const demerit_points = memberRecords.reduce((sum, r) => sum + r.demerit_points, 0);
-  return { present, late, absent, demerit_points, risk_state: getRiskState(demerit_points) };
+  const raw_demerit_points = memberRecords.reduce((sum, r) => sum + r.demerit_points, 0);
+  const camp_credit_total = campEntries.reduce((sum, entry) => sum + entry.demerit_credit, 0);
+  const demerit_points = Math.max(0, raw_demerit_points - camp_credit_total);
+  return {
+    present,
+    late,
+    absent,
+    demerit_points,
+    raw_demerit_points,
+    camp_credit_total,
+    risk_state: getRiskState(demerit_points),
+  };
+}
+
+function mapCampResponse(row: {
+  id: string;
+  response_date: string;
+  attended?: boolean;
+  from_time: string;
+  to_time: string;
+  time_slots?: string[] | null;
+  duration_minutes: number;
+  demerit_credit: number;
+}): CampDemeritEntry {
+  const formatTime = (value: string) => value.slice(0, 5);
+  return {
+    id: row.id,
+    response_date: row.response_date,
+    attended: row.attended !== false,
+    from_time: formatTime(row.from_time),
+    to_time: formatTime(row.to_time),
+    time_slots: row.time_slots?.length ? row.time_slots.map(formatTime) : undefined,
+    duration_minutes: row.duration_minutes,
+    demerit_credit: Number(row.demerit_credit),
+  };
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -142,77 +183,74 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [sessionsState, setSessions] = useState<Session[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
-  const [cohortsState, setCohorts] = useState<Cohort[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [campResponses, setCampResponses] = useState<CampDemeritEntry[]>([]);
+  const [campResponsesByMember, setCampResponsesByMember] = useState<Record<string, CampDemeritEntry[]>>({});
 
   const generateCode = () =>
     String(Math.floor(10000 + Math.random() * 90000));
 
-  // Computed members with summary
+  const campByMember = useMemo(() => {
+    if (isAdminPortal) return campResponsesByMember;
+    if (!currentUser || currentRole !== 'member') return {};
+    return { [currentUser.id]: campResponses };
+  }, [campResponses, campResponsesByMember, currentRole, currentUser, isAdminPortal]);
+
   const members: MemberWithSummary[] = profiles
     .filter(p => p.role === 'member')
-    .map(p => ({ ...p, summary: computeMemberSummary(p.id, records) }));
+    .map(p => ({ ...p, summary: computeMemberSummary(p.id, records, campByMember[p.id] || []) }));
 
-  const fetchAll = useCallback(async (showLoading = true) => {
-    if (showLoading) setLoading(true);
-    const [profilesRes, sessionsRes, recordsRes, cohortsRes] = await Promise.all([
-      supabase.from('profiles').select('*').order('created_at', { ascending: true }),
-      supabase.from('sessions').select('*').order('start_at', { ascending: true }),
-      supabase.from('attendance_records').select('*').order('created_at', { ascending: true }),
-      supabase.from('cohorts').select('*'),
-    ]);
+  const fetchAll = useCallback(async () => {
+    await supabase.rpc('maybe_open_due_sessions');
 
-    if (profilesRes.data) setProfiles(profilesRes.data.map(mapProfile));
-
-    let mappedSessions: Session[] = [];
-    if (sessionsRes.data) mappedSessions = sessionsRes.data.map(mapSession);
-
-    const now = Date.now();
-    const dueSessions = mappedSessions.filter(s => {
-      if (s.status !== 'scheduled') return false;
-      const openAt = new Date(s.start_at).getTime() - s.check_in_open_minutes * 60000;
-      const closeAt = new Date(s.start_at).getTime() + s.late_deadline_minutes * 60000;
-      return now >= openAt && now < closeAt;
-    });
-
-    if (dueSessions.length > 0) {
-      await Promise.all(dueSessions.map(s => {
-        const code = s.attendance_code || generateCode();
-        const startAt = new Date(s.start_at).getTime();
-        const expiresAt = new Date(startAt + s.late_deadline_minutes * 60000).toISOString();
-        return supabase.from('sessions').update({
-          status: 'open',
-          attendance_code: code,
-          attendance_code_status: 'active',
-          attendance_code_issued_at: new Date().toISOString(),
-          attendance_code_expires_at: expiresAt,
-        }).eq('id', s.id);
-      }));
-
-      const { data: refreshedSessions } = await supabase
-        .from('sessions')
-        .select('*')
-        .order('start_at', { ascending: true });
-
-      if (refreshedSessions) {
-        mappedSessions = refreshedSessions.map(mapSession);
+    if (isAdminPortal) {
+      const [profilesRes, sessionsRes, recordsRes, campRes] = await Promise.all([
+        supabase.from('profiles').select('*').order('created_at', { ascending: true }),
+        supabase.from('sessions').select('*').order('start_at', { ascending: true }),
+        supabase.from('attendance_records').select('*').order('created_at', { ascending: true }),
+        adminApi<{ responses?: Array<{
+          id: string;
+          profile_id: string;
+          response_date: string;
+          attended?: boolean;
+          from_time: string;
+          to_time: string;
+          time_slots?: string[] | null;
+          duration_minutes: number;
+          demerit_credit: number;
+        }> }>('get_camp_responses', {}),
+      ]);
+      if (profilesRes.data) setProfiles(profilesRes.data.map(mapProfile));
+      if (sessionsRes.data) setSessions(sessionsRes.data.map(mapSession));
+      if (recordsRes.data) setRecords(recordsRes.data.map(mapAttendanceRecord));
+      const grouped: Record<string, CampDemeritEntry[]> = {};
+      for (const row of campRes.data?.responses || []) {
+        const entry = mapCampResponse(row);
+        grouped[row.profile_id] = [...(grouped[row.profile_id] || []), entry];
       }
+      setCampResponsesByMember(grouped);
+      return;
     }
 
-    setSessions(mappedSessions);
-
+    const memberId = currentUser?.role === 'member' ? currentUser.id : null;
+    const [sessionsRes, recordsRes, campMemberRes] = await Promise.all([
+      supabase.from('sessions').select('*').order('start_at', { ascending: true }),
+      supabase.from('attendance_records').select('*').order('created_at', { ascending: true }),
+      memberId
+        ? supabase.rpc('get_member_camp_responses', { p_profile_id: memberId })
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (sessionsRes.data) setSessions(sessionsRes.data.map(mapSession));
     if (recordsRes.data) setRecords(recordsRes.data.map(mapAttendanceRecord));
-
-    if (cohortsRes.data) setCohorts(cohortsRes.data.map(mapCohort));
-
-    setLoading(false);
-  }, []);
+    if (campMemberRes.data) {
+      setCampResponses((campMemberRes.data as Array<Parameters<typeof mapCampResponse>[0]>).map(mapCampResponse));
+    }
+  }, [isAdminPortal, currentUser]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   // Auto-refresh every 30s to pick up auto-opened sessions
   useEffect(() => {
-    const interval = setInterval(() => fetchAll(false), 30000);
+    const interval = setInterval(() => fetchAll(), 30000);
     return () => clearInterval(interval);
   }, [fetchAll]);
 
@@ -270,7 +308,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, handleSessionChange)
       .subscribe(status => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          fetchAll(false);
+          fetchAll();
         }
       });
 
@@ -279,17 +317,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [fetchAll]);
 
-  const loginAsAdmin = useCallback(async (email: string, _password: string) => {
-    if (email) {
-      setCurrentUser({
-        id: 'admin-local', role: 'admin', full_name: '운영진',
-        email, status: 'active',
-      });
-      setCurrentRole('admin');
-      return true;
-    }
-    return false;
+  const unlockAdminConsole = useCallback(() => {
+    setCurrentUser({
+      id: 'admin-local', role: 'admin', full_name: '운영진', status: 'active',
+    });
+    setCurrentRole('admin');
   }, []);
+
+  const loginAsMemberById = useCallback(async (profileId: string) => {
+    const cached = profiles.find(p => p.id === profileId && p.role === 'member' && p.status === 'active');
+    let found = cached;
+    if (!found) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', profileId)
+        .eq('role', 'member')
+        .eq('status', 'active')
+        .maybeSingle();
+      if (data) found = mapProfile(data);
+    }
+    if (found) {
+      setCurrentUser(found);
+      setCurrentRole('member');
+      persistMemberSession(found.id);
+      const summary = computeMemberSummary(found.id, records);
+      return { ...found, summary };
+    }
+    return null;
+  }, [profiles, records]);
 
   const loginAsMember = useCallback(async (name: string) => {
     const { data } = await supabase.from('profiles').select('*').eq('role', 'member').eq('full_name', name).eq('status', 'active');
@@ -301,81 +357,59 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
       setCurrentUser(profile);
       setCurrentRole('member');
+      persistMemberSession(profile.id);
       const summary = computeMemberSummary(found.id, records);
       return { ...profile, summary };
     }
     return null;
   }, [records]);
 
+  const resolveAndLoginWithPortalToken = useCallback(async (token: string) => {
+    const { data, error } = await supabase.rpc('resolve_member_portal_token', { p_token: token });
+    if (error) return null;
+    const result = data as { ok?: boolean; profile_id?: string };
+    if (!result?.ok || !result.profile_id) return null;
+    return loginAsMemberById(result.profile_id);
+  }, [loginAsMemberById]);
+
   const logout = useCallback(() => {
+    if (isAdminPortal) clearAdminToken();
+    clearMemberSession();
     setCurrentUser(null);
     setCurrentRole(null);
-  }, []);
+  }, [isAdminPortal]);
+
+  useEffect(() => {
+    if (isAdminPortal || currentUser) return;
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    if (/[?&]m=/.test(hash)) return;
+    const savedId = typeof window !== 'undefined' ? sessionStorage.getItem(MEMBER_SESSION_KEY) : null;
+    if (!savedId) return;
+    void loginAsMemberById(savedId).then(member => {
+      if (!member) clearMemberSession();
+    });
+  }, [isAdminPortal, currentUser, loginAsMemberById]);
 
   const openCheckIn = useCallback(async (sessionId: string) => {
-    const session = sessionsState.find(s => s.id === sessionId);
-    const code = session?.attendance_code || generateCode();
-    // 만료시간 = 세션 시작시간 + 지각마감(분)
-    const startAt = session ? new Date(session.start_at).getTime() : Date.now();
-    const lateMin = session?.late_deadline_minutes ?? 30;
-    const expiresAt = new Date(startAt + lateMin * 60000).toISOString();
-    const { error } = await supabase.from('sessions').update({
-      status: 'open',
-      attendance_code: code,
-      attendance_code_status: 'active',
-      attendance_code_issued_at: new Date().toISOString(),
-      attendance_code_expires_at: expiresAt,
-    }).eq('id', sessionId);
+    const { error } = await adminApi('open_check_in', { sessionId });
     if (!error) await fetchAll();
-  }, [sessionsState, fetchAll]);
+  }, [fetchAll]);
 
   const closeCheckIn = useCallback(async (sessionId: string) => {
-    // Auto-mark absent for members who didn't check in (exclude those with any existing record, including excused_absent)
-    const activeMembers = profiles.filter(p => p.role === 'member' && p.status === 'active');
-    const sessionRecords = records.filter(r => r.session_id === sessionId);
-    const recordedIds = new Set(sessionRecords.map(r => r.member_id));
-    const absentMembers = activeMembers.filter(m => !recordedIds.has(m.id));
-
-    if (absentMembers.length > 0) {
-      const absentRecords = absentMembers.map(m => ({
-        session_id: sessionId,
-        member_id: m.id,
-        member_name: m.full_name,
-        status: 'unexcused_absent',
-        checked_in_at: new Date().toISOString(),
-        check_in_method: 'auto',
-        code_verified: false,
-        location_verified: false,
-        demerit_points: 1,
-      }));
-      await supabase.from('attendance_records').insert(absentRecords);
-    }
-
-    await supabase.from('sessions').update({
-      status: 'closed', attendance_code_status: 'expired',
-    }).eq('id', sessionId);
-    await fetchAll();
-  }, [profiles, records, fetchAll]);
+    const { error } = await adminApi('close_check_in', { sessionId });
+    if (!error) await fetchAll();
+  }, [fetchAll]);
 
   const regenerateCode = useCallback(async (sessionId: string) => {
-    const session = sessionsState.find(s => s.id === sessionId);
-    const newCode = generateCode();
-    const startAt = session ? new Date(session.start_at).getTime() : Date.now();
-    const lateMin = session?.late_deadline_minutes ?? 30;
-    const expiresAt = new Date(startAt + lateMin * 60000).toISOString();
-    await supabase.from('sessions').update({
-      attendance_code: newCode,
-      attendance_code_issued_at: new Date().toISOString(),
-      attendance_code_expires_at: expiresAt,
-    }).eq('id', sessionId);
-    await fetchAll();
-    return newCode;
-  }, [sessionsState, fetchAll]);
+    const { data, error } = await adminApi<{ code?: string }>('regenerate_code', { sessionId });
+    if (!error) await fetchAll();
+    return data?.code || generateCode();
+  }, [fetchAll]);
 
   const createSession = useCallback(async (session: Partial<Session>) => {
-    await supabase.from('sessions').insert({
-      title: session.title!,
-      start_at: session.start_at!,
+    const { error } = await adminApi('create_session', {
+      title: session.title,
+      start_at: session.start_at,
       end_at: session.end_at || null,
       venue_name: session.venue_name || null,
       venue_map_url: session.venue_map_url || null,
@@ -385,13 +419,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       notes: session.notes || null,
       status: session.status || 'scheduled',
     });
-    await fetchAll();
+    if (!error) await fetchAll();
   }, [fetchAll]);
 
   const updateSession = useCallback(async (session: Session) => {
-    await supabase.from('sessions').update({
-      title: session.title, start_at: session.start_at,
-      status: session.status, notes: session.notes || null,
+    const { error } = await adminApi('update_session', {
+      id: session.id,
+      title: session.title,
+      start_at: session.start_at,
+      status: session.status,
+      notes: session.notes || null,
       venue_name: session.venue_name || null,
       venue_map_url: session.venue_map_url || null,
       attendance_code: session.attendance_code,
@@ -399,79 +436,67 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       check_in_open_minutes: session.check_in_open_minutes,
       attendance_deadline_minutes: session.attendance_deadline_minutes,
       late_deadline_minutes: session.late_deadline_minutes,
-    }).eq('id', session.id);
-    await fetchAll();
+    });
+    if (!error) await fetchAll();
   }, [fetchAll]);
 
   const deleteSession = useCallback(async (sessionId: string) => {
-    await supabase.from('attendance_records').delete().eq('session_id', sessionId);
-    await supabase.from('sessions').delete().eq('id', sessionId);
-    await fetchAll();
+    const { error } = await adminApi('delete_session', { sessionId });
+    if (!error) await fetchAll();
   }, [fetchAll]);
 
   const checkIn = useCallback(async (sessionId: string, memberId: string, code: string) => {
-    const session = sessionsState.find(s => s.id === sessionId);
-    if (!session) return { success: false, message: '세션을 찾을 수 없습니다.' };
-    if (session.status !== 'open') return { success: false, message: '운영진이 현장 출결을 열면 체크인할 수 있습니다.' };
-    if (session.attendance_code_status !== 'active') return { success: false, message: '출결코드가 활성화되지 않았습니다.' };
-    if (session.attendance_code !== code) return { success: false, message: '출결코드가 일치하지 않습니다.' };
-
-    const existing = records.find(r => r.session_id === sessionId && r.member_id === memberId);
-    if (existing) return { success: true, status: existing.status, message: '이미 체크인 완료', existing: true };
-
-    const now = new Date();
-    const start = new Date(session.start_at);
-    const deadlineMs = session.attendance_deadline_minutes * 60000;
-    const lateMs = session.late_deadline_minutes * 60000;
-
-    let status: AttendanceStatus;
-    if (now.getTime() < start.getTime() + deadlineMs) status = 'present';
-    else if (now.getTime() < start.getTime() + lateMs) status = 'late';
-    else status = 'unexcused_absent';
-
-    const demerit = getDemeritPoints(status);
-    const member = profiles.find(p => p.id === memberId);
-
-    const { error } = await supabase.from('attendance_records').insert({
-      session_id: sessionId,
-      member_id: memberId,
-      member_name: member?.full_name || '',
-      status,
-      checked_in_at: now.toISOString(),
-      check_in_method: 'code',
-      code_verified: true,
-      location_verified: true,
-      demerit_points: demerit,
+    const { data, error } = await supabase.rpc('member_check_in', {
+      p_session_id: sessionId,
+      p_member_id: memberId,
+      p_code: code,
     });
 
     if (error) return { success: false, message: '체크인 중 오류가 발생했습니다.' };
+
+    const result = data as {
+      success?: boolean;
+      status?: AttendanceStatus;
+      message?: string;
+      existing?: boolean;
+      checked_in_at?: string;
+    };
+
+    if (!result?.success) {
+      return { success: false, message: result?.message || '체크인에 실패했습니다.' };
+    }
+
     await fetchAll();
 
-    void supabase.functions.invoke('send-checkin-email', {
-      body: {
-        memberId,
-        sessionId,
-        checkedInAt: now.toISOString(),
-        status,
-      },
-    });
+    if (!result.existing && result.status) {
+      void supabase.functions.invoke('send-checkin-email', {
+        body: {
+          memberId,
+          sessionId,
+          checkedInAt: result.checked_in_at || new Date().toISOString(),
+          status: result.status,
+        },
+      });
+    }
 
-    return { success: true, status, message: status === 'present' ? '출석 완료!' : status === 'late' ? '지각 처리되었습니다.' : '결석 처리되었습니다.' };
-  }, [sessionsState, records, profiles, fetchAll]);
+    return {
+      success: true,
+      status: result.status,
+      message: result.message || '체크인 완료',
+      existing: result.existing,
+    };
+  }, [fetchAll]);
 
   const overrideAttendance = useCallback(async (recordId: string, newStatus: AttendanceStatus, reason: string) => {
-    const newDemerit = getDemeritPoints(newStatus);
-    // Find real admin profile ID from DB profiles (not local hardcoded id)
     const adminProfile = profiles.find(p => p.role === 'admin');
-    const { error } = await supabase.from('attendance_records').update({
+    const { error } = await adminApi('override_attendance', {
+      recordId,
       status: newStatus,
-      demerit_points: newDemerit,
-      override_reason: reason || null,
+      reason,
       override_by: adminProfile?.id || null,
-      override_at: new Date().toISOString(),
-    }).eq('id', recordId);
+    });
     if (error) console.error('Override failed:', error);
-    await fetchAll();
+    else await fetchAll();
   }, [profiles, fetchAll]);
 
   const getSessionRecords = useCallback((sessionId: string) => {
@@ -483,94 +508,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [records]);
 
   const addMember = useCallback(async (data: { full_name: string; cohort_label: string; email?: string }) => {
-    await supabase.from('profiles').insert({
-      role: 'member',
+    const { error } = await adminApi('add_member', {
       full_name: data.full_name,
       cohort_label: data.cohort_label,
       email: data.email || null,
-      status: 'active',
     });
-    await fetchAll();
+    if (!error) await fetchAll();
   }, [fetchAll]);
 
   const updateMember = useCallback(async (id: string, data: { full_name: string; cohort_label: string; status: 'active' | 'inactive'; email?: string }) => {
-    await supabase.from('profiles').update({
+    const { error } = await adminApi('update_member', {
+      id,
       full_name: data.full_name,
       cohort_label: data.cohort_label,
       status: data.status,
       email: data.email || null,
-    }).eq('id', id);
-    await fetchAll();
+    });
+    if (!error) await fetchAll();
   }, [fetchAll]);
 
   const deleteMember = useCallback(async (id: string) => {
-    const { error } = await supabase
-      .from('profiles')
-      .delete()
-      .eq('id', id)
-      .eq('role', 'member');
-
+    const { error } = await adminApi('delete_member', { id });
     if (error) {
       console.error('Delete member failed:', error);
       return false;
     }
-
-    await fetchAll();
-    return true;
-  }, [fetchAll]);
-
-  const addStaffProfile = useCallback(async (data: { full_name: string; role: 'admin' | 'staff'; email?: string; phone?: string }) => {
-    const { error } = await supabase.from('profiles').insert({
-      role: data.role,
-      full_name: data.full_name,
-      email: data.email || null,
-      phone: data.phone || null,
-      status: 'active',
-    });
-
-    if (error) {
-      console.error('Add staff failed:', error);
-      return false;
-    }
-
-    await fetchAll();
-    return true;
-  }, [fetchAll]);
-
-  const updateStaffProfile = useCallback(async (id: string, data: { full_name: string; role: 'admin' | 'staff'; status: 'active' | 'inactive'; email?: string; phone?: string }) => {
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        role: data.role,
-        full_name: data.full_name,
-        status: data.status,
-        email: data.email || null,
-        phone: data.phone || null,
-      })
-      .eq('id', id)
-      .in('role', ['admin', 'staff']);
-
-    if (error) {
-      console.error('Update staff failed:', error);
-      return false;
-    }
-
-    await fetchAll();
-    return true;
-  }, [fetchAll]);
-
-  const deleteStaffProfile = useCallback(async (id: string) => {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ status: 'inactive' })
-      .eq('id', id)
-      .in('role', ['admin', 'staff']);
-
-    if (error) {
-      console.error('Delete staff failed:', error);
-      return false;
-    }
-
     await fetchAll();
     return true;
   }, [fetchAll]);
@@ -579,54 +541,47 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const existing = records.find(r => r.session_id === sessionId && r.member_id === memberId);
     if (existing) return;
     const member = profiles.find(p => p.id === memberId);
-    const demerit = getDemeritPoints(status);
-    await supabase.from('attendance_records').insert({
-      session_id: sessionId,
-      member_id: memberId,
-      member_name: member?.full_name || '',
+    const { error } = await adminApi('add_manual_record', {
+      sessionId,
+      memberId,
+      memberName: member?.full_name || '',
       status,
-      checked_in_at: new Date().toISOString(),
-      check_in_method: 'manual',
-      code_verified: false,
-      location_verified: false,
-      demerit_points: demerit,
     });
-    await fetchAll();
+    if (!error) await fetchAll();
   }, [records, profiles, fetchAll]);
 
   const submitAbsenceRequest = useCallback(async (sessionId: string, memberId: string, status: 'excused_absent' | 'unexcused_absent', category?: string, note?: string) => {
-    const existing = records.find(r => r.session_id === sessionId && r.member_id === memberId);
-    if (existing) return;
-    const member = profiles.find(p => p.id === memberId);
-    const demerit = getDemeritPoints(status);
-    await supabase.from('attendance_records').insert({
-      session_id: sessionId,
-      member_id: memberId,
-      member_name: member?.full_name || '',
-      status,
-      checked_in_at: new Date().toISOString(),
-      check_in_method: 'manual',
-      code_verified: false,
-      location_verified: false,
-      demerit_points: demerit,
-      exception_category: category || null,
-      exception_note: note || null,
+    const { data, error } = await supabase.rpc('member_submit_absence', {
+      p_session_id: sessionId,
+      p_member_id: memberId,
+      p_status: status,
+      p_category: category || null,
+      p_note: note || null,
     });
+    if (error) {
+      console.error('Absence request failed:', error);
+      return false;
+    }
+    const result = data as { success?: boolean; message?: string };
+    if (!result?.success) {
+      console.error('Absence request rejected:', result?.message);
+      return false;
+    }
     await fetchAll();
-  }, [records, profiles, fetchAll]);
+    return true;
+  }, [fetchAll]);
 
   return (
     <AppContext.Provider value={{
       currentUser, currentRole, profiles, members,
       sessions: sessionsState, attendanceRecords: records,
-      cohorts: cohortsState, loading,
-      loginAsAdmin, loginAsMember, logout,
+      campResponses, campResponsesByMember,
+      unlockAdminConsole, loginAsMember, loginAsMemberById, resolveAndLoginWithPortalToken, logout,
       openCheckIn, closeCheckIn, regenerateCode,
       createSession, updateSession, deleteSession,
       checkIn, overrideAttendance,
       getSessionRecords, getMemberRecords,
       addMember, updateMember, deleteMember,
-      addStaffProfile, updateStaffProfile, deleteStaffProfile,
       addManualRecord,
       submitAbsenceRequest,
       refreshData: fetchAll,

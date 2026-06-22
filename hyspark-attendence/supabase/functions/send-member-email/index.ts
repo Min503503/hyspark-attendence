@@ -1,5 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
+  adminClient,
+  requireAdmin,
+} from "../_shared/admin-auth.ts";
+import {
   buildManualEmailHtml,
   manualEmailHeadline,
 } from "../_shared/email-html-templates.ts";
@@ -41,7 +45,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(requireEnv("SUPABASE_URL"), requireEnv("SUPABASE_SERVICE_ROLE_KEY"));
+    const supabase = adminClient();
+    const authError = await requireAdmin(req, supabase);
+    if (authError) return authError;
+
     const from = requireEnv("GMAIL_FROM");
     const accessToken = await getGmailAccessToken();
     const results: Array<{ memberId: string; email: string; messageId?: string; error?: string }> = [];

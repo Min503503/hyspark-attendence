@@ -1,7 +1,5 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
-import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppProvider } from "@/contexts/AppContext";
 import { Shield } from "lucide-react";
@@ -19,7 +17,6 @@ import AdminEmail from "@/pages/AdminEmail";
 import Index from "@/pages/Index";
 import NotFound from "@/pages/NotFound";
 
-const queryClient = new QueryClient();
 const isAdminPortal = import.meta.env.VITE_PORTAL === 'admin';
 
 function GlobalAdminFooter() {
@@ -49,37 +46,34 @@ function MemberLegacyRedirect() {
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <AppProvider>
-        <div className="min-h-screen bg-grid bg-soft-gradient">
-          <HashRouter>
-            <Routes>
-              <Route path="/" element={isAdminPortal ? <Navigate to="/admin" replace /> : <Index />} />
-              <Route path="/admin" element={<AdminGate><AdminLayout /></AdminGate>}>
-                <Route index element={<AdminDashboard />} />
-                <Route path="members" element={<AdminMembers />} />
-                <Route path="members/:id" element={<MemberDetail />} />
-                <Route path="sessions" element={<AdminSessions />} />
-                <Route path="sessions/new" element={<SessionEditor />} />
-                <Route path="sessions/:id/edit" element={<SessionEditor />} />
-                <Route path="sessions/:id" element={<SessionDetail />} />
-                <Route path="email" element={<AdminEmail />} />
-                <Route path="reports" element={<AdminReports />} />
-              </Route>
-              <Route path="/member/login" element={<Navigate to="/" replace />} />
-              <Route path="/member" element={<MemberLegacyRedirect />} />
-              <Route path="/member/*" element={<MemberLegacyRedirect />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </HashRouter>
-          {!isAdminPortal && <GlobalAdminFooter />}
-        </div>
-      </AppProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <TooltipProvider>
+    <Sonner />
+    <AppProvider>
+      <div className="min-h-screen bg-grid bg-soft-gradient">
+        <HashRouter>
+          <Routes>
+            <Route path="/" element={isAdminPortal ? <Navigate to="/admin" replace /> : <Index />} />
+            <Route path="/admin" element={<AdminGate><AdminLayout /></AdminGate>}>
+              <Route index element={<AdminDashboard />} />
+              <Route path="members" element={<AdminMembers />} />
+              <Route path="members/:id" element={<MemberDetail />} />
+              <Route path="sessions" element={<AdminSessions />} />
+              <Route path="sessions/new" element={<SessionEditor />} />
+              <Route path="sessions/:id/edit" element={<SessionEditor />} />
+              <Route path="sessions/:id" element={<SessionDetail />} />
+              <Route path="email" element={<AdminEmail />} />
+              <Route path="reports" element={<AdminReports />} />
+            </Route>
+            <Route path="/member/login" element={<Navigate to="/" replace />} />
+            <Route path="/member" element={<MemberLegacyRedirect />} />
+            <Route path="/member/*" element={<MemberLegacyRedirect />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </HashRouter>
+        {!isAdminPortal && <GlobalAdminFooter />}
+      </div>
+    </AppProvider>
+  </TooltipProvider>
 );
 
 export default App;

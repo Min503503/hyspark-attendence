@@ -14,8 +14,8 @@ HySpark는 **한 코드베이스, 두 빌드·두 호스팅**이다.
 
 | 포털 | env | 빌드 | Firebase |
 |------|-----|------|----------|
-| 학회원 | `VITE_PORTAL=member` | `npm run build:member` → `dist-member` | https://hyspark-attendance-member.web.app |
-| 관리자 | `VITE_PORTAL=admin` | `npm run build:admin` → `dist-admin` | https://hyspark-attendance-admin.web.app |
+| 학회원 | `VITE_PORTAL=member` | `npm run build:member` → `dist-member` | https://hysparkpre-member.web.app |
+| 관리자 | `VITE_PORTAL=admin` | `npm run build:admin` → `dist-admin` | https://hysparkpre-admin.web.app |
 
 - `npm run build`만 하면 `dist/`만 갱신된다. **프로덕션에 반영되지 않는다.**
 - 로컬 `npm run dev` 기본값은 member가 아닐 수 있다. admin dev면 `/`가 관리자로 리다이렉트된다.

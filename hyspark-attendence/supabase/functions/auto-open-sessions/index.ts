@@ -1,14 +1,15 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  adminClient,
+  generateAttendanceCode,
+  requireAdminOrCron,
+} from "../_shared/admin-auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-admin-token, x-cron-secret",
 };
-
-function generateCode(): string {
-  return String(Math.floor(10000 + Math.random() * 90000));
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -25,9 +26,12 @@ Deno.serve(async (req) => {
     // empty body is fine for cron
   }
 
+  const supabase = adminClient();
+  const authError = await requireAdminOrCron(req, supabase);
+  if (authError) return authError;
+
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const supabase = createClient(supabaseUrl, supabaseKey);
 
   const now = new Date();
 
@@ -53,7 +57,7 @@ Deno.serve(async (req) => {
     );
 
     if (now >= openTime) {
-      const code = generateCode();
+      const code = generateAttendanceCode();
       const expiresAt = new Date(
         startAt.getTime() + session.late_deadline_minutes * 60 * 1000
       );
@@ -102,14 +106,14 @@ Deno.serve(async (req) => {
         .eq("session_id", session.id);
 
       const checkedInIds = new Set(
-        (existingRecords || []).map((r: any) => r.member_id)
+        (existingRecords || []).map((r: { member_id: string }) => r.member_id)
       );
 
       // Insert unexcused_absent for members with no record at all
       // (excused_absent members already have a record, so they're excluded)
       const absentRecords = (allMembers || [])
-        .filter((m: any) => !checkedInIds.has(m.id))
-        .map((m: any) => ({
+        .filter((m: { id: string }) => !checkedInIds.has(m.id))
+        .map((m: { id: string; full_name: string }) => ({
           session_id: session.id,
           member_id: m.id,
           member_name: m.full_name,

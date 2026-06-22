@@ -22,6 +22,8 @@ export interface MemberSummary {
   late: number;
   absent: number;
   demerit_points: number;
+  raw_demerit_points?: number;
+  camp_credit_total?: number;
   risk_state: RiskState;
 }
 
@@ -119,6 +121,22 @@ export const PENALTY_POLICY: PenaltyPolicy = {
   withdrawal_threshold: 4.0,
   demo_day_impact: true,
 };
+
+export const CAMP_DEMERIT_OFFSET = {
+  hours_per_block: 5,
+  credit_per_block: 0.25,
+} as const;
+
+export interface CampDemeritEntry {
+  id: string;
+  response_date: string;
+  attended: boolean;
+  from_time: string;
+  to_time: string;
+  time_slots?: string[];
+  duration_minutes: number;
+  demerit_credit: number;
+}
 
 export const EXCEPTION_CATEGORIES = [
   '가족 경조사',

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # HySpark Gmail → Supabase Edge Function 배포
-# 필요: utwzwlowluxrdlifypzx 프로젝트 Owner/Developer 권한 + supabase login (같은 계정)
+# 필요: lwbjprzrnmlnmzlxiwrv 프로젝트 Owner/Developer 권한 + supabase login (같은 계정)
 
 set -euo pipefail
 
@@ -39,8 +39,10 @@ echo "=== Gmail secrets 등록 ==="
 supabase secrets set --project-ref "$PROJECT_REF" --env-file "$ENV_FILE"
 
 echo "=== Edge Function 배포 ==="
-supabase functions deploy "$FUNCTION_NAME" --project-ref "$PROJECT_REF"
+supabase functions deploy send-member-email --project-ref "$PROJECT_REF"
+supabase functions deploy send-camp-survey-reminder --project-ref "$PROJECT_REF"
+supabase functions deploy admin-api --project-ref "$PROJECT_REF"
 
 echo ""
 echo "✅ 완료"
-echo "테스트: https://hyspark-attendance-admin.web.app/#/admin/members"
+echo "테스트: https://hysparkpre-admin.web.app/#/admin/members"

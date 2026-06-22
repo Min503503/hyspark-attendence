@@ -11,8 +11,8 @@
     "build:member": "VITE_PORTAL=member vite build --outDir dist-member",
     "build:admin": "VITE_PORTAL=admin vite build --outDir dist-admin",
     "build:firebase": "npm run build:member && npm run build:admin",
-    "deploy:admin": "npm run build:admin && NODE_TLS_REJECT_UNAUTHORIZED=0 npx -y firebase-tools@latest deploy --only hosting:admin --project pi-shirt",
-    "deploy": "npm run build:firebase && NODE_TLS_REJECT_UNAUTHORIZED=0 npx -y firebase-tools@latest deploy --only hosting:admin,hosting:member --project pi-shirt",
+    "deploy:admin": "bash scripts/firebase-deploy-guard.sh && npm run build:admin && NODE_TLS_REJECT_UNAUTHORIZED=0 npx -y firebase-tools@latest deploy --only hosting:admin --project hyspark-95182",
+    "deploy": "bash scripts/firebase-deploy-guard.sh && npm run build:firebase && NODE_TLS_REJECT_UNAUTHORIZED=0 npx -y firebase-tools@latest deploy --only hosting:admin,hosting:member --project hyspark-95182",
     "gmail:setup": "cd scripts/gmail && (test -d .venv || python3 -m venv .venv) && .venv/bin/pip install -q -r requirements.txt && .venv/bin/python setup.py",
     "gmail:setup:fresh": "cd scripts/gmail && (test -d .venv || python3 -m venv .venv) && .venv/bin/pip install -q -r requirements.txt && .venv/bin/python setup.py --fresh",
     "gmail:test": "cd scripts/gmail && .venv/bin/python send_test.py",
@@ -22,7 +22,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "smoke": "bash scripts/smoke-security.sh",
+    "smoke:e2e": "bash scripts/smoke-e2e-api.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

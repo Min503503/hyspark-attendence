@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import type { Session } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import MemberActionComplete from '@/components/member/MemberActionComplete';
 import { EXCUSED_CATEGORIES } from '@/lib/member-utils';
 import { cn } from '@/lib/utils';
 
@@ -18,7 +20,7 @@ interface AbsenceDialogProps {
     type: 'excused_absent' | 'unexcused_absent';
     categoryLabel?: string;
     note?: string;
-  }) => Promise<void>;
+  }) => Promise<boolean>;
 }
 
 export default function AbsenceDialog({ open, onOpenChange, sessions, onSubmit }: AbsenceDialogProps) {
@@ -44,6 +46,7 @@ export default function AbsenceDialog({ open, onOpenChange, sessions, onSubmit }
 
   const canProceedStep1 = Boolean(sessionId);
   const canProceedStep2 = absenceType === 'excused_absent' ? Boolean(category) : Boolean(note.trim());
+  const selectedSession = sessions.find(session => session.id === sessionId);
 
   const handleSubmit = async () => {
     if (!sessionId) return;
@@ -51,14 +54,18 @@ export default function AbsenceDialog({ open, onOpenChange, sessions, onSubmit }
     const categoryLabel = absenceType === 'excused_absent'
       ? EXCUSED_CATEGORIES.find(item => item.value === category)?.label
       : undefined;
-    await onSubmit({
+    const ok = await onSubmit({
       sessionId,
       type: absenceType,
       categoryLabel,
       note: note || undefined,
     });
     setLoading(false);
-    handleOpenChange(false);
+    if (ok) {
+      setStep(4);
+      return;
+    }
+    toast.error('결석 신청에 실패했습니다. 다시 시도해 주세요.');
   };
 
   return (
@@ -67,7 +74,7 @@ export default function AbsenceDialog({ open, onOpenChange, sessions, onSubmit }
         <DialogHeader>
           <DialogTitle>결석 신청</DialogTitle>
           <div className="flex items-center gap-2 pt-1">
-            {[1, 2, 3].map(number => (
+            {[1, 2, 3, 4].map(number => (
               <div
                 key={number}
                 className={cn(
@@ -206,6 +213,18 @@ export default function AbsenceDialog({ open, onOpenChange, sessions, onSubmit }
                 </Button>
               </div>
             </>
+          )}
+
+          {step === 4 && (
+            <MemberActionComplete
+              title="결석 신청 완료"
+              description={
+                selectedSession
+                  ? `${selectedSession.title} 세션 결석 신청이 접수되었습니다.`
+                  : '결석 신청이 접수되었습니다.'
+              }
+              onDismiss={() => handleOpenChange(false)}
+            />
           )}
         </div>
       </DialogContent>

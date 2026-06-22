@@ -7,13 +7,13 @@
   "edgeFunction": "send-member-email",
   "oauthScopes": ["https://www.googleapis.com/auth/gmail.send"],
   "oauthConsent": {
-    "homepageUrl": "https://hyspark-attendance-member.web.app/about.html",
-    "privacyPolicyUrl": "https://hyspark-attendance-member.web.app/privacy.html",
-    "termsOfServiceUrl": "https://hyspark-attendance-member.web.app/terms.html",
+    "homepageUrl": "https://hysparkpre-member.web.app/about.html",
+    "privacyPolicyUrl": "https://hysparkpre-member.web.app/privacy.html",
+    "termsOfServiceUrl": "https://hysparkpre-member.web.app/terms.html",
     "authorizedDomains": [
-      "hyspark-attendance-member.web.app",
-      "hyspark-attendance-admin.web.app"
+      "hysparkpre-member.web.app",
+      "hysparkpre-admin.web.app"
     ],
-    "memberSiteUrl": "https://hyspark-attendance-member.web.app/"
+    "memberSiteUrl": "https://hysparkpre-member.web.app/"
   }
 }

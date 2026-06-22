@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { PENALTY_POLICY, getRiskState } from '@/types';
+import { CAMP_DEMERIT_OFFSET, PENALTY_POLICY, getRiskState } from '@/types';
 import { Button } from '@/components/ui/button';
 import { StatusPill } from '@/components/app-ui';
 import PinCodeInput from '@/components/member/PinCodeInput';
@@ -8,18 +8,18 @@ import SessionPhaseBar from '@/components/member/SessionPhaseBar';
 import AttendanceRing from '@/components/member/AttendanceRing';
 import MemberBottomNav, { type MemberTab } from '@/components/member/MemberBottomNav';
 import AbsenceDialog from '@/components/member/AbsenceDialog';
+import MemberActionComplete from '@/components/member/MemberActionComplete';
+import { formatCampDuration, formatCampParticipationLabel } from '@/lib/campSurvey';
 import {
   AlertTriangle,
   CalendarDays,
-  CheckCircle2,
   Clock,
   FileText,
   Loader2,
   MapPin,
   Timer,
-  XCircle,
+  Sparkles,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import {
   ATTENDANCE_STATUS_LABEL,
   ATTENDANCE_STATUS_TONE,
@@ -40,7 +40,7 @@ type MemberHomeProps = {
 };
 
 export default function MemberHome({ initialIntent = null, onIntentHandled }: MemberHomeProps) {
-  const { currentUser, sessions, getMemberRecords, checkIn, submitAbsenceRequest } = useApp();
+  const { currentUser, sessions, campResponses, getMemberRecords, checkIn, submitAbsenceRequest, refreshData } = useApp();
   const records = getMemberRecords(currentUser?.id || '');
 
   const [activeTab, setActiveTab] = useState<MemberTab>('checkin');
@@ -73,7 +73,9 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
     const absentCount = records.filter(record =>
       record.status === 'absent' || record.status === 'excused_absent' || record.status === 'unexcused_absent',
     ).length;
-    const demeritPoints = records.reduce((sum, record) => sum + record.demerit_points, 0);
+    const rawDemeritPoints = records.reduce((sum, record) => sum + record.demerit_points, 0);
+    const campCreditTotal = campResponses.reduce((sum, entry) => sum + entry.demerit_credit, 0);
+    const demeritPoints = Math.max(0, rawDemeritPoints - campCreditTotal);
     const riskState = getRiskState(demeritPoints);
     const countedRecords = records.filter(record =>
       ['present', 'late', 'absent', 'excused_absent', 'unexcused_absent'].includes(record.status),
@@ -109,6 +111,8 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
       lateCount,
       absentCount,
       demeritPoints,
+      rawDemeritPoints,
+      campCreditTotal,
       riskState,
       attendanceRate,
       openSession,
@@ -118,7 +122,7 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
       recentRecords,
       availableForAbsence,
     };
-  }, [records, sessions, now]);
+  }, [records, sessions, now, campResponses]);
 
   const isCheckInAvailable = view.openSession?.status === 'open'
     && view.openSession?.attendance_code_status === 'active'
@@ -153,23 +157,14 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
     categoryLabel?: string;
     note?: string;
   }) => {
-    if (!currentUser) return;
-    await submitAbsenceRequest(
+    if (!currentUser) return false;
+    return submitAbsenceRequest(
       payload.sessionId,
       currentUser.id,
       payload.type,
       payload.categoryLabel,
       payload.note,
     );
-    toast.success('결석 신청이 완료되었습니다.');
-  };
-
-  const resultConfig = {
-    present: { icon: CheckCircle2, tone: 'text-status-present', bg: 'bg-status-present/10' },
-    late: { icon: AlertTriangle, tone: 'text-status-late', bg: 'bg-status-late/10' },
-    absent: { icon: XCircle, tone: 'text-status-absent', bg: 'bg-status-absent/10' },
-    already: { icon: CheckCircle2, tone: 'text-muted-foreground', bg: 'bg-secondary/60' },
-    error: { icon: XCircle, tone: 'text-destructive', bg: 'bg-destructive/10' },
   };
 
   const cohortLabel = currentUser?.cohort_label || 'HySpark 학회원';
@@ -233,33 +228,22 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
                   />
 
                   {view.existingOpenRecord ? (
-                    <div className="rounded-xl bg-secondary/50 px-3 py-4 text-center">
-                      <CheckCircle2 className="mx-auto h-8 w-8 text-status-present" />
-                      <p className="mt-2 text-base font-extrabold">
-                        {ATTENDANCE_STATUS_LABEL[view.existingOpenRecord.status]} 처리됨
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {view.existingOpenRecord.checked_in_at
+                    <MemberActionComplete
+                      title={`${ATTENDANCE_STATUS_LABEL[view.existingOpenRecord.status]} 처리됨`}
+                      description={
+                        view.existingOpenRecord.checked_in_at
                           ? formatDateTime(view.existingOpenRecord.checked_in_at)
-                          : '이미 이 세션 출결이 기록되어 있습니다.'}
-                      </p>
-                    </div>
+                          : '이미 이 세션 출결이 기록되어 있습니다.'
+                      }
+                      variant="info"
+                    />
                   ) : result ? (
-                    <div className={cn('rounded-xl px-3 py-4 text-center', resultConfig[result].bg)}>
-                      {(() => {
-                        const Icon = resultConfig[result].icon;
-                        return <Icon className={cn('mx-auto h-8 w-8', resultConfig[result].tone)} />;
-                      })()}
-                      <p className="mt-2 text-base font-extrabold">{resultMsg}</p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => { setResult(null); setCode(''); }}
-                        className="mt-3 h-8"
-                      >
-                        확인
-                      </Button>
-                    </div>
+                    <MemberActionComplete
+                      title={result === 'error' ? '체크인 실패' : result === 'already' ? '이미 체크인 완료' : '체크인 완료'}
+                      description={resultMsg}
+                      variant={result === 'error' ? 'info' : 'success'}
+                      onDismiss={() => { setResult(null); setCode(''); }}
+                    />
                   ) : (
                     <div className="space-y-3">
                       <PinCodeInput
@@ -342,6 +326,11 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
                     <div className="rounded-xl bg-secondary/50 p-3">
                       <p className="text-[10px] font-semibold text-muted-foreground">벌점</p>
                       <p className="text-xl font-extrabold tabular-nums">{view.demeritPoints}</p>
+                      {view.campCreditTotal > 0 && (
+                        <p className="mt-0.5 text-[10px] text-primary">
+                          캠프 상쇄 -{view.campCreditTotal.toFixed(2)}
+                        </p>
+                      )}
                     </div>
                     <div className="rounded-xl bg-secondary/50 p-3">
                       <p className="text-[10px] font-semibold text-muted-foreground">결석</p>
@@ -387,6 +376,7 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
                 {[
                   { label: '지각', value: `${PENALTY_POLICY.late_points}점` },
                   { label: '결석', value: `${PENALTY_POLICY.absent_points}점` },
+                  { label: '캠프 상쇄', value: `${CAMP_DEMERIT_OFFSET.hours_per_block}시간당 ${CAMP_DEMERIT_OFFSET.credit_per_block}점` },
                   { label: '면담 기준', value: `${PENALTY_POLICY.counseling_threshold}점 이상` },
                   { label: '탈회 기준', value: `${PENALTY_POLICY.withdrawal_threshold}점 이상` },
                 ].map(item => (
@@ -397,6 +387,34 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
                 ))}
               </div>
             </div>
+
+            {campResponses.length > 0 && (
+              <div className="member-card p-5">
+                <div className="mb-3 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-extrabold">캠프 참여 상쇄</h3>
+                </div>
+                <div className="space-y-2">
+                  {campResponses.map(entry => (
+                    <div key={entry.id} className="flex items-center justify-between rounded-lg bg-secondary/40 px-3 py-2">
+                      <div>
+                        <p className="text-xs font-bold">{entry.response_date}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {formatCampParticipationLabel(entry)}
+                        </p>
+                      </div>
+                      {entry.attended === false ? (
+                        <span className="text-xs font-bold text-muted-foreground">미참여</span>
+                      ) : (
+                        <span className="text-xs font-bold tabular-nums text-primary">
+                          -{entry.demerit_credit.toFixed(2)}점
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 

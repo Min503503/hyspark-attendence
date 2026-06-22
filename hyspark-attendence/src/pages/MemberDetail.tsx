@@ -138,6 +138,11 @@ export default function MemberDetail() {
           <MetricCard key={s.label} label={s.label} value={s.value} tone={s.tone} />
         ))}
       </div>
+      {(member.summary.camp_credit_total || 0) > 0 && (
+        <p className="-mt-2 text-xs text-primary">
+          캠프 참여 상쇄 -{(member.summary.camp_credit_total || 0).toFixed(2)}점 반영 (순 벌점 {member.summary.demerit_points}점)
+        </p>
+      )}
 
       <Surface className="animate-reveal-up overflow-hidden" style={{ animationDelay: '120ms' }}>
         <div className="flex items-center gap-2 border-b border-border/60 px-4 py-3">

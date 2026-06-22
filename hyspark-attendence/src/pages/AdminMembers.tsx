@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/contexts/AppContext';
-import { supabase } from '@/integrations/supabase/client';
+import { invokeWithAdminToken } from '@/lib/adminApi';
 import type { MemberWithSummary } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -106,7 +106,7 @@ export default function AdminMembers() {
     }
 
     setSendingMail(true);
-    const { data, error } = await supabase.functions.invoke('send-member-email', {
+    const { data, error } = await invokeWithAdminToken('send-member-email', {
       body: {
         recipientIds: mailRecipients.map(member => member.id),
         subject: mailSubject.trim(),

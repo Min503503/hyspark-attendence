@@ -35,7 +35,7 @@
 - **교훈**: `.cursor/rules/dual-portal-delivery.mdc` 준수. “안 보인다” = 포털·빌드·배포부터.
 
 ### C. “완료” 보고가 코드 수정에만 그침
-- 사용자는 **hyspark-attendance-*.web.app** 에서 확인함.
+- 사용자는 **https://hysparkpre-admin.web.app** / **https://hysparkpre-member.web.app** 에서 확인함.
 - 로컬 `npm run dev` 안내만 하고 배포는 나중에 → “안 보인다” 피드백.
 - **교훈**: UI 완료 보고 = **확인 URL(로컬 member/admin + 프로덕션) + 배포 여부** 필수.
 

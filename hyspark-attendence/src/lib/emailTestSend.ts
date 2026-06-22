@@ -1,9 +1,43 @@
 import { supabase } from '@/integrations/supabase/client';
+import { invokeWithAdminToken } from '@/lib/adminApi';
 import {
   EmailTemplateKind,
   buildEmailFromSession,
 } from '@/lib/emailHtmlTemplates';
+import { memberPortalUrlForProfile } from '@/lib/memberPortalToken';
 import type { MemberWithSummary, Session } from '@/types';
+import { filterTestEmailRecipients } from '@/lib/emailTestPolicy';
+
+async function buildPersonalizedEmail(
+  kind: EmailTemplateKind,
+  member: MemberWithSummary,
+  session: Session,
+  checkInExtra?: { checkedInAt: string; attendanceStatus: 'present' | 'late' | 'unexcused_absent' },
+) {
+  const [absenceLink, checkInLink] = await Promise.all([
+    memberPortalUrlForProfile('absence', member.id),
+    memberPortalUrlForProfile('checkin', member.id),
+  ]);
+  return buildEmailFromSession(
+    kind,
+    { full_name: member.full_name },
+    {
+      title: session.title,
+      start_at: session.start_at,
+      venue_name: session.venue_name,
+      venue_map_url: session.venue_map_url,
+      venue_lat: session.venue_lat,
+      venue_lng: session.venue_lng,
+      attendance_code: session.attendance_code,
+      check_in_open_minutes: session.check_in_open_minutes,
+    },
+    {
+      ...checkInExtra,
+      absenceLink,
+      checkInLink,
+    },
+  );
+}
 
 export async function sendTemplateEmails(params: {
   kind: EmailTemplateKind;
@@ -13,10 +47,12 @@ export async function sendTemplateEmails(params: {
   checkInExtra?: { checkedInAt: string; attendanceStatus: 'present' | 'late' | 'unexcused_absent' };
 }) {
   const { kind, session, members, ruleId, checkInExtra } = params;
-  const recipients = members.filter(m => m.status === 'active' && m.email);
+  const recipients = filterTestEmailRecipients(
+    members.filter(m => m.status === 'active' && m.email),
+  );
 
   if (recipients.length === 0) {
-    return { error: new Error('이메일이 등록된 수신자가 없습니다.'), sent: 0 };
+    return { error: new Error('테스트 발송은 cmins1@naver.com 등록 멤버만 가능합니다.'), sent: 0 };
   }
 
   if (kind === 'checkin_complete') {
@@ -51,30 +87,17 @@ export async function sendTemplateEmails(params: {
     return { error: null, sent };
   }
 
-  const messages = recipients.map(member => {
-    const { subject, html } = buildEmailFromSession(
-      kind,
-      { full_name: member.full_name },
-      {
-        title: session.title,
-        start_at: session.start_at,
-        venue_name: session.venue_name,
-        venue_map_url: session.venue_map_url,
-        venue_lat: session.venue_lat,
-        venue_lng: session.venue_lng,
-        attendance_code: session.attendance_code,
-        check_in_open_minutes: session.check_in_open_minutes,
-      },
-    );
+  const messages = await Promise.all(recipients.map(async member => {
+    const { subject, html } = await buildPersonalizedEmail(kind, member, session);
     return {
       recipientId: member.id,
       subject,
       body: html,
       html: true,
     };
-  });
+  }));
 
-  const { data, error } = await supabase.functions.invoke('send-member-email', {
+  const { data, error } = await invokeWithAdminToken('send-member-email', {
     body: {
       messages,
       ruleId: ruleId || null,
@@ -109,4 +132,15 @@ export function buildPreviewHtml(
     },
     checkInExtra,
   ).html;
+}
+
+/** Admin 미리보기·테스트 발송용 — 수신 멤버별 m= 토큰 링크 포함 */
+export async function buildPreviewHtmlAsync(
+  kind: EmailTemplateKind,
+  session: Session,
+  member: MemberWithSummary,
+  checkInExtra?: { checkedInAt: string; attendanceStatus: 'present' | 'late' | 'unexcused_absent' },
+) {
+  const built = await buildPersonalizedEmail(kind, member, session, checkInExtra);
+  return built.html;
 }

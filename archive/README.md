@@ -6,7 +6,7 @@
 |------|------|
 | `hyspark-attendence-live/` | 예전 Vercel 배포 스냅샷 |
 | `hyspark-attendence-github/` | GitHub 업로드용 복사본 |
-| `project-code/` | 초기 프로젝트 코드 (1차 Firebase 시도 포함) |
+| `project-code/` | 초기 프로젝트 코드 (**`.firebaserc` = `pi-shirt` — 배포 금지**) |
 | `original/project-code.zip` | 최초 전달 zip |
 | `FILE_INDEX-2026-06-10.txt` | 2026-06-10 정리 당시 전체 파일 목록 |
 

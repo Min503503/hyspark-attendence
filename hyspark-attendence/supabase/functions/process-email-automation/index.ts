@@ -11,6 +11,7 @@ import {
   triggerToTemplateKind,
 } from "../_shared/email-html-templates.ts";
 import { computeAutomationSendAtFromRule } from "../_shared/email-schedule.ts";
+import { getMemberPortalToken, memberPortalUrl } from "../_shared/member-portal-link.ts";
 
 const WINDOW_MS = 20 * 60 * 1000;
 
@@ -131,7 +132,11 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          const { subject, html } = buildEmailFromSession(templateKind, profile, session);
+          const portalToken = await getMemberPortalToken(supabase, profile.id);
+          const { subject, html } = buildEmailFromSession(templateKind, profile, session, {
+            absenceLink: memberPortalUrl("absence", { token: portalToken }),
+            checkInLink: memberPortalUrl("checkin", { token: portalToken }),
+          });
 
           try {
             const result = await sendGmail(accessToken, from, profile.email!, subject, html, { html: true });

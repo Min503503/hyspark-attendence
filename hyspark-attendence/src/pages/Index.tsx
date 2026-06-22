@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowRight, Loader2, LogOut } from 'lucide-react';
 import hysparkLogo from '@/assets/hyspark-logo.png';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import MemberHome from '@/pages/MemberHome';
+import MemberCampSurvey from '@/pages/MemberCampSurvey';
 import { APP_NAME, APP_TAGLINE } from '@/lib/brand';
 import SessionPhaseBar from '@/components/member/SessionPhaseBar';
 import {
@@ -18,15 +19,57 @@ export default function Index() {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [tokenResolving, setTokenResolving] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [searchParams, setSearchParams] = useSearchParams();
   const intent = searchParams.get('intent');
-  const { currentRole, currentUser, sessions, loginAsMember, logout } = useApp();
+  const portalToken = searchParams.get('m');
+  const resolvedTokenRef = useRef<string | null>(null);
+  const {
+    currentRole,
+    currentUser,
+    sessions,
+    loginAsMember,
+    resolveAndLoginWithPortalToken,
+    logout,
+  } = useApp();
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!portalToken) {
+      setTokenResolving(false);
+      return;
+    }
+    if (resolvedTokenRef.current === portalToken) {
+      setTokenResolving(false);
+      return;
+    }
+
+    let cancelled = false;
+    setTokenResolving(true);
+    setError('');
+
+    void resolveAndLoginWithPortalToken(portalToken).then(member => {
+      if (cancelled) return;
+      resolvedTokenRef.current = portalToken;
+      setTokenResolving(false);
+      if (member) {
+        const next = new URLSearchParams(searchParams);
+        next.delete('m');
+        setSearchParams(next, { replace: true });
+      } else {
+        setError('링크가 유효하지 않습니다. 이름으로 로그인해 주세요.');
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [portalToken, resolveAndLoginWithPortalToken, searchParams, setSearchParams]);
 
   const sessionGuide = useMemo(() => {
     const targetSession = findRelevantSession(sessions, now);
@@ -53,7 +96,9 @@ export default function Index() {
   };
 
   const isMemberSignedIn = currentRole === 'member' && currentUser?.role === 'member';
-  const memberIntent = intent === 'absence' || intent === 'checkin' ? intent : null;
+  const memberIntent = intent === 'absence' || intent === 'checkin' || intent === 'camp-survey'
+    ? intent
+    : null;
 
   const clearIntent = () => {
     if (!searchParams.has('intent')) return;
@@ -61,6 +106,10 @@ export default function Index() {
     next.delete('intent');
     setSearchParams(next, { replace: true });
   };
+
+  if (!tokenResolving && isMemberSignedIn && intent === 'camp-survey') {
+    return <MemberCampSurvey />;
+  }
 
   return (
     <div className="member-portal min-h-[100dvh] bg-grid bg-soft-gradient">
@@ -86,19 +135,30 @@ export default function Index() {
         </header>
 
         <main className="min-h-0 flex-1 overflow-y-auto">
-          {isMemberSignedIn ? (
+          {tokenResolving ? (
+            <div className="flex flex-col items-center justify-center gap-3 px-4 py-16 text-sm text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              본인 계정으로 연결하는 중…
+            </div>
+          ) : isMemberSignedIn ? (
             <MemberHome initialIntent={memberIntent} onIntentHandled={clearIntent} />
           ) : (
             <div className="flex flex-col px-4 pb-5 pt-1">
               <section className="member-card overflow-hidden p-4 shadow-md shadow-primary/5">
                 <div className="mb-4">
                   <h1 className="text-lg font-extrabold leading-snug tracking-tight">
-                    {memberIntent === 'absence' ? '이름 입력 후 결석 신청' : '학회원 이름을 입력하세요'}
+                    {memberIntent === 'absence'
+                      ? '이름 입력 후 결석 신청'
+                      : memberIntent === 'camp-survey'
+                        ? '이름 입력 후 캠프 설문'
+                        : '학회원 이름을 입력하세요'}
                   </h1>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {memberIntent === 'absence'
                       ? '등록된 이름으로 로그인하면 결석 신청 화면이 열립니다.'
-                      : '등록된 이름으로 출석·결석 신청을 할 수 있습니다.'}
+                      : memberIntent === 'camp-survey'
+                        ? '등록된 이름으로 로그인하면 오늘 캠프 참여 시간 입력 화면이 열립니다.'
+                        : '등록된 이름으로 출석·결석 신청을 할 수 있습니다.'}
                   </p>
                 </div>
 
@@ -131,7 +191,11 @@ export default function Index() {
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <>
-                        {memberIntent === 'absence' ? '결석 신청하기' : '출석하기'}
+                        {memberIntent === 'absence'
+                          ? '결석 신청하기'
+                          : memberIntent === 'camp-survey'
+                            ? '캠프 설문하기'
+                            : '출석하기'}
                         <ArrowRight className="ml-1.5 h-4 w-4" />
                       </>
                     )}

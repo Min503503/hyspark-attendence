@@ -94,9 +94,9 @@ alwaysApply: true
 
 ## 4. 계정·URL 고정값
 
-- Admin: `https://hyspark-attendance-admin.web.app`
-- Member: `https://hyspark-attendance-member.web.app`
-- Firebase project: `pi-shirt`
+- Admin: `https://hysparkpre-admin.web.app`
+- Member: `https://hysparkpre-member.web.app`
+- Firebase project: `hyspark-95182` (구 `pi-shirt` 대체)
 - Supabase ref: `lwbjprzrnmlnmzlxiwrv`
 - Gmail: `choimeans2@gmail.com`
 - 작업 디렉터리: `hyspark-attendence/` (스파크어탠던스_코드정리_20260610 하위)

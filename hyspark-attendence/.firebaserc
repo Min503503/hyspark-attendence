@@ -1,15 +1,15 @@
 {
   "projects": {
-    "default": "pi-shirt"
+    "default": "hyspark-95182"
   },
   "targets": {
-    "pi-shirt": {
+    "hyspark-95182": {
       "hosting": {
         "admin": [
-          "hyspark-attendance-admin"
+          "hysparkpre-admin"
         ],
         "member": [
-          "hyspark-attendance-member"
+          "hysparkpre-member"
         ]
       }
     }

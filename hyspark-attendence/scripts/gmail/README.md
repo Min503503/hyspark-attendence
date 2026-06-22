@@ -19,18 +19,18 @@ Production 검증 **없이** Gmail만 쓰려면:
 | 항목 | 값 |
 |------|-----|
 | 앱 이름 | **HySpark** |
-| **홈페이지** | `https://hyspark-attendance-member.web.app/about.html` ← `/` 아님 |
-| 개인정보 | `https://hyspark-attendance-member.web.app/privacy.html` |
-| 서비스 약관 | `https://hyspark-attendance-member.web.app/terms.html` |
-| 승인된 도메인 | `hyspark-attendance-member.web.app`, `hyspark-attendance-admin.web.app` |
+| **홈페이지** | `https://hysparkpre-member.web.app/about.html` ← `/` 아님 |
+| 개인정보 | `https://hysparkpre-member.web.app/privacy.html` |
+| 서비스 약관 | `https://hysparkpre-member.web.app/terms.html` |
+| 승인된 도메인 | `hysparkpre-member.web.app`, `hysparkpre-admin.web.app` |
 
 > `/` 는 학회원 **이름 입력(로그인)** 화면이라 Google이 거절합니다. **반드시 `/about.html`** 을 홈페이지로 등록하세요.
 
 ### Search Console (도메인 소유)
 
 1. **choimeans2@gmail.com** 으로 Search Console + Cloud Console **동일 계정**
-2. 속성: `https://hyspark-attendance-member.web.app` (URL 접두어)
-3. 소유권 확인: https://hyspark-attendance-member.web.app/google4c418dbf064f5b42.html
+2. 속성: `https://hysparkpre-member.web.app` (URL 접두어)
+3. 소유권 확인: https://hysparkpre-member.web.app/google4c418dbf064f5b42.html
 4. Search Console → **설정 → 연결** → Google Cloud 프로젝트 **`hyspark`** 연결
 5. OAuth 저장 후 **몇 시간** 기다렸다가 재제출
 

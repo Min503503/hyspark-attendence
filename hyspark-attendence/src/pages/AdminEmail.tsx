@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, Loader2, Mail, Send, Settings2 } from 'lucide-react';
+import { Activity, Loader2, Mail, Send, Settings2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,8 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useApp } from '@/contexts/AppContext';
 import { supabase } from '@/integrations/supabase/client';
+import { adminApi, invokeWithAdminToken } from '@/lib/adminApi';
+import { PUBLIC_URLS } from '@/lib/brand';
 import { GMAIL_SENDER } from '@/lib/mail';
 import {
   EMAIL_KIND_LABELS,
@@ -25,14 +27,22 @@ import {
   EmailSendLog,
   findRuleForKind,
   orderedStandardRules,
-  syncDefaultAutomationRules,
 } from '@/lib/emailAutomation';
 import {
   AUTOMATION_SCHEDULE_POLICY,
   describeAutomationSendForSession,
   upcomingAutomationSessions,
 } from '@/lib/emailSchedule';
-import { buildPreviewHtml, sendTemplateEmails } from '@/lib/emailTestSend';
+import { buildPreviewHtmlAsync, sendTemplateEmails } from '@/lib/emailTestSend';
+import { TEST_EMAIL_RECIPIENT } from '@/lib/emailTestPolicy';
+import {
+  buildCampSurveyPreviewHtml,
+  buildCampSurveyPreviewHtmlAsync,
+  formatCampTodayLabel,
+  sendCampSurveyTestEmails,
+} from '@/lib/campSurveyEmail';
+import { memberPortalUrlForProfile } from '@/lib/memberPortalToken';
+import { memberPortalUrl } from '@/lib/brand';
 import MemberRecipientPicker from '@/components/MemberRecipientPicker';
 import { PageHeader, PageShell, Panel, AdminTabBar, StatusPill } from '@/components/app-ui';
 
@@ -50,7 +60,7 @@ const TEST_KINDS: EmailTemplateKind[] = [
 function injectPreviewLogo(html: string) {
   if (typeof window === 'undefined') return html;
   const logoUrl = `${window.location.origin}/hyspark-logo.png`;
-  return html.replaceAll('https://hyspark-attendance-admin.web.app/hyspark-logo.png', logoUrl);
+  return html.replaceAll(PUBLIC_URLS.emailLogo, logoUrl);
 }
 
 function formatRelativeTime(iso: string): string {
@@ -99,6 +109,19 @@ export default function AdminEmail() {
   const [manualBody, setManualBody] = useState('');
   const [manualRecipientIds, setManualRecipientIds] = useState<string[]>([]);
   const [sendingManual, setSendingManual] = useState(false);
+  const [campSettings, setCampSettings] = useState<{
+    title: string;
+    start_date: string;
+    end_date: string;
+    daily_open_time: string;
+    daily_close_time: string;
+    enabled: boolean;
+  } | null>(null);
+  const [sendingCampTest, setSendingCampTest] = useState(false);
+  const [automationPreviewHtml, setAutomationPreviewHtml] = useState('');
+  const [testPreviewHtml, setTestPreviewHtml] = useState('');
+  const [campPreviewHtml, setCampPreviewHtml] = useState('');
+  const [campSurveyMemberLink, setCampSurveyMemberLink] = useState(memberPortalUrl('camp-survey'));
 
   const membersWithEmail = useMemo(
     () => members.filter(m => m.status === 'active' && m.email),
@@ -154,44 +177,6 @@ export default function AdminEmail() {
     return picked || membersWithEmail[0];
   }, [membersWithEmail, testRecipientIds]);
 
-  const automationPreviewHtml = useMemo(() => {
-    if (automationPreviewSession) {
-      return injectPreviewLogo(buildPreviewHtml(
-        selectedRuleKind,
-        automationPreviewSession,
-        automationPreviewMemberName,
-        selectedRuleKind === 'checkin_complete'
-          ? { checkedInAt: new Date().toISOString(), attendanceStatus: 'present' }
-          : undefined,
-      ));
-    }
-    const sample = SAMPLE_EMAIL_DATA[selectedRuleKind];
-    return injectPreviewLogo(buildPreviewHtml(
-      selectedRuleKind,
-      {
-        id: 'sample',
-        title: sample.sessionTitle,
-        start_at: new Date().toISOString(),
-        venue_name: sample.venueName,
-        venue_map_url: sample.venueMapsUrl,
-        check_in_open_minutes: sample.checkInOpenMinutes ?? 15,
-        geofence_radius_m: 100,
-        session_code: 'sample',
-        attendance_code: null,
-        attendance_code_status: 'inactive',
-        attendance_code_issued_at: null,
-        attendance_code_expires_at: null,
-        qr_token: 'sample',
-        status: 'scheduled',
-        attendance_rate: null,
-      },
-      sample.memberName,
-      selectedRuleKind === 'checkin_complete'
-        ? { checkedInAt: sample.checkedInAt || new Date().toISOString(), attendanceStatus: 'present' }
-        : undefined,
-    ));
-  }, [automationPreviewSession, automationPreviewMemberName, selectedRuleKind]);
-
   const automationPreviewSubject = useMemo(() => {
     const sample = SAMPLE_EMAIL_DATA[selectedRuleKind];
     if (automationPreviewSession) {
@@ -203,22 +188,122 @@ export default function AdminEmail() {
     return buildEmailSubject(selectedRuleKind, sample);
   }, [selectedRuleKind, automationPreviewSession]);
 
-  const previewHtml = useMemo(() => {
-    if (!selectedTestSession || !previewMember) return '';
-    return injectPreviewLogo(buildPreviewHtml(
-      testKind,
-      selectedTestSession,
-      previewMember.full_name,
-      testKind === 'checkin_complete'
-        ? { checkedInAt: new Date().toISOString(), attendanceStatus: 'present' }
-        : undefined,
-    ));
+  useEffect(() => {
+    if (!automationPreviewMember) {
+      setAutomationPreviewHtml('');
+      return;
+    }
+    let cancelled = false;
+    const checkInExtra = selectedRuleKind === 'checkin_complete'
+      ? { checkedInAt: new Date().toISOString(), attendanceStatus: 'present' as const }
+      : undefined;
+    const session = automationPreviewSession ?? {
+      id: 'sample',
+      title: SAMPLE_EMAIL_DATA[selectedRuleKind].sessionTitle,
+      start_at: new Date().toISOString(),
+      venue_name: SAMPLE_EMAIL_DATA[selectedRuleKind].venueName,
+      venue_map_url: SAMPLE_EMAIL_DATA[selectedRuleKind].venueMapsUrl,
+      check_in_open_minutes: SAMPLE_EMAIL_DATA[selectedRuleKind].checkInOpenMinutes ?? 15,
+      geofence_radius_m: 100,
+      session_code: 'sample',
+      attendance_code: null,
+      attendance_code_status: 'inactive' as const,
+      attendance_code_issued_at: null,
+      attendance_code_expires_at: null,
+      qr_token: 'sample',
+      status: 'scheduled' as const,
+      attendance_rate: null,
+    };
+
+    void buildPreviewHtmlAsync(selectedRuleKind, session, automationPreviewMember, checkInExtra)
+      .then(html => {
+        if (!cancelled) setAutomationPreviewHtml(injectPreviewLogo(html));
+      })
+      .catch(err => {
+        if (!cancelled) {
+          console.error(err);
+          setAutomationPreviewHtml('');
+          toast.error('미리보기 링크 생성 실패 — 관리자 로그인 상태를 확인하세요.');
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [automationPreviewSession, automationPreviewMember, selectedRuleKind]);
+
+  useEffect(() => {
+    if (!selectedTestSession || !previewMember) {
+      setTestPreviewHtml('');
+      return;
+    }
+    let cancelled = false;
+    const checkInExtra = testKind === 'checkin_complete'
+      ? { checkedInAt: new Date().toISOString(), attendanceStatus: 'present' as const }
+      : undefined;
+
+    void buildPreviewHtmlAsync(testKind, selectedTestSession, previewMember, checkInExtra)
+      .then(html => {
+        if (!cancelled) setTestPreviewHtml(injectPreviewLogo(html));
+      })
+      .catch(err => {
+        if (!cancelled) {
+          console.error(err);
+          setTestPreviewHtml('');
+        }
+      });
+
+    return () => { cancelled = true; };
   }, [selectedTestSession, previewMember, testKind]);
 
   const manualPreviewMember = useMemo(() => {
     const picked = membersWithEmail.find(member => manualRecipientIds.includes(member.id));
     return picked || membersWithEmail[0];
   }, [membersWithEmail, manualRecipientIds]);
+
+  const campTestMember = useMemo(
+    () => membersWithEmail.find(
+      member => member.email?.trim().toLowerCase() === TEST_EMAIL_RECIPIENT.toLowerCase(),
+    ),
+    [membersWithEmail],
+  );
+
+  const campDateRange = campSettings
+    ? `${campSettings.start_date} ~ ${campSettings.end_date}`
+    : '—';
+
+  useEffect(() => {
+    if (!campSettings) {
+      setCampPreviewHtml('');
+      return;
+    }
+    const member = campTestMember;
+    if (!member) {
+      setCampPreviewHtml(injectPreviewLogo(buildCampSurveyPreviewHtml({
+        memberName: '홍길동',
+        campTitle: campSettings.title,
+        campDateRange,
+      })));
+      setCampSurveyMemberLink(memberPortalUrl('camp-survey'));
+      return;
+    }
+    let cancelled = false;
+    void buildCampSurveyPreviewHtmlAsync({
+      memberId: member.id,
+      memberName: member.full_name,
+      campTitle: campSettings.title,
+      campDateRange,
+    }).then(html => {
+      if (!cancelled) setCampPreviewHtml(injectPreviewLogo(html));
+    });
+    void memberPortalUrlForProfile('camp-survey', member.id).then(link => {
+      if (!cancelled) setCampSurveyMemberLink(link);
+    });
+    return () => { cancelled = true; };
+  }, [campDateRange, campSettings, campTestMember]);
+
+  const campReminderLogs = useMemo(
+    () => logs.filter(log => log.dedupe_key?.startsWith('camp-survey-') || log.subject.includes('캠프 참여 시간')),
+    [logs],
+  );
 
   const manualPreviewHtml = useMemo(() => {
     const subject = manualSubject.trim();
@@ -233,17 +318,22 @@ export default function AdminEmail() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const syncResult = await syncDefaultAutomationRules(supabase);
+    const syncResult = await adminApi('sync_automation_rules', {});
     if (syncResult.error) toast.error(`규칙 동기화 실패: ${syncResult.error.message}`);
-    const [rulesRes, logsRes, runsRes] = await Promise.all([
+    const [rulesRes, logsRes, runsRes, campRes] = await Promise.all([
       supabase.from('email_automation_rules').select('*').order('sort_order'),
       supabase.from('email_send_logs').select('*').order('sent_at', { ascending: false }).limit(30),
       supabase.from('email_automation_runs').select('*').order('checked_at', { ascending: false }).limit(10),
+      supabase.from('camp_settings').select('title, start_date, end_date, daily_open_time, daily_close_time, enabled').eq('enabled', true).order('start_date', { ascending: false }).limit(1).maybeSingle(),
     ]);
     if (rulesRes.error) toast.error(rulesRes.error.message);
     else setRules((rulesRes.data || []) as EmailAutomationRule[]);
-    if (!logsRes.error) setLogs((logsRes.data || []) as EmailSendLog[]);
-    if (!runsRes.error) setAutomationRuns((runsRes.data || []) as EmailAutomationRun[]);
+    if (logsRes.error) toast.error(`발송 로그 불러오기 실패: ${logsRes.error.message}`);
+    else setLogs((logsRes.data || []) as EmailSendLog[]);
+    if (runsRes.error) toast.error(`자동화 실행 기록 불러오기 실패: ${runsRes.error.message}`);
+    else setAutomationRuns((runsRes.data || []) as EmailAutomationRun[]);
+    if (campRes.data) setCampSettings(campRes.data);
+    else setCampSettings(null);
     setLoading(false);
   }, []);
 
@@ -251,7 +341,12 @@ export default function AdminEmail() {
 
   useEffect(() => {
     if (membersWithEmail.length === 0) return;
-    setTestRecipientIds(prev => (prev.length > 0 ? prev : membersWithEmail.map(member => member.id)));
+    const testMember = membersWithEmail.find(
+      member => member.email?.trim().toLowerCase() === TEST_EMAIL_RECIPIENT.toLowerCase(),
+    );
+    setTestRecipientIds(prev => (
+      prev.length > 0 ? prev : testMember ? [testMember.id] : []
+    ));
     setManualRecipientIds(prev => (prev.length > 0 ? prev : membersWithEmail.map(member => member.id)));
     setAutomationPreviewMemberId(prev => (
       prev && membersWithEmail.some(member => member.id === prev)
@@ -272,10 +367,10 @@ export default function AdminEmail() {
       item.id === rule.id ? { ...item, enabled: nextEnabled } : item
     )));
 
-    const { error } = await supabase
-      .from('email_automation_rules')
-      .update({ enabled: nextEnabled, updated_at: new Date().toISOString() })
-      .eq('id', rule.id);
+    const { error } = await adminApi('toggle_automation_rule', {
+      ruleId: rule.id,
+      enabled: nextEnabled,
+    });
 
     setTogglingRuleId(null);
 
@@ -297,7 +392,7 @@ export default function AdminEmail() {
 
   const runAutomationNow = async () => {
     setRunningAutomation(true);
-    const { data, error } = await supabase.functions.invoke('auto-open-sessions', {
+    const { data, error } = await invokeWithAdminToken('auto-open-sessions', {
       body: { trigger_source: 'admin_manual' },
     });
     setRunningAutomation(false);
@@ -329,6 +424,11 @@ export default function AdminEmail() {
     }
 
     const recipients = membersWithEmail.filter(member => testRecipientIds.includes(member.id));
+    if (recipients.every(member => member.email?.trim().toLowerCase() !== TEST_EMAIL_RECIPIENT.toLowerCase())) {
+      toast.error(`테스트 발송은 ${TEST_EMAIL_RECIPIENT} 만 가능합니다.`);
+      return;
+    }
+
     const rule = findRuleForKind(rules, testKind);
 
     setSendingTest(true);
@@ -364,7 +464,7 @@ export default function AdminEmail() {
     }
 
     setSendingManual(true);
-    const { data, error } = await supabase.functions.invoke('send-member-email', {
+    const { data, error } = await invokeWithAdminToken('send-member-email', {
       body: {
         recipientIds: manualRecipientIds,
         subject: manualSubject.trim(),
@@ -389,6 +489,33 @@ export default function AdminEmail() {
     load();
   };
 
+  const sendCampTestMail = async () => {
+    if (!campSettings) {
+      toast.error('활성화된 캠프 설정이 없습니다.');
+      return;
+    }
+    if (!campTestMember) {
+      toast.error(`테스트 발송은 ${TEST_EMAIL_RECIPIENT} 등록 멤버가 필요합니다.`);
+      return;
+    }
+
+    setSendingCampTest(true);
+    const { error, sent } = await sendCampSurveyTestEmails({
+      members: [campTestMember],
+      campTitle: campSettings.title,
+      campDateRange,
+    });
+    setSendingCampTest(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    toast.success(`캠프 설문 리마인드 테스트 ${sent}건 발송 (${TEST_EMAIL_RECIPIENT})`);
+    load();
+  };
+
   const sessionTitle = (sessionId: string | null) =>
     sessions.find(s => s.id === sessionId)?.title || '-';
 
@@ -404,6 +531,7 @@ export default function AdminEmail() {
         onChange={setActiveTab}
         tabs={[
           { id: 'automation', label: '자동 발송' },
+          { id: 'camp', label: '캠프 설문' },
           { id: 'test', label: '테스트 발송' },
           { id: 'send', label: '수동 발송' },
           { id: 'logs', label: '발송 로그' },
@@ -624,11 +752,124 @@ export default function AdminEmail() {
         </>
       )}
 
+      {activeTab === 'camp' && (
+        <div className="space-y-4">
+          <Panel
+            title="캠프 일일 설문 — 어떻게 가나요?"
+            icon={Sparkles}
+            description="세션 출석과 별도. 캠프 기간 중 매일 밤 리마인드 메일 → 멤버가 참여 시간(또는 출석 안 함) 제출."
+          >
+            {loading ? (
+              <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                불러오는 중…
+              </div>
+            ) : campSettings ? (
+              <div className="space-y-4">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2.5 text-xs">
+                    <div className="font-bold text-muted-foreground">캠프</div>
+                    <div className="mt-1 font-semibold">{campSettings.title}</div>
+                    <div className="mt-0.5 text-muted-foreground">{campDateRange}</div>
+                    <div className="mt-0.5 text-muted-foreground">
+                      운영 {campSettings.daily_open_time.slice(0, 5)}-{campSettings.daily_close_time.slice(0, 5)}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2.5 text-xs">
+                    <div className="font-bold text-muted-foreground">자동 발송</div>
+                    <div className="mt-1 font-medium">매일 22:00 (KST)</div>
+                    <div className="mt-0.5 text-muted-foreground">활성 학회원 전원 · 이메일 등록자</div>
+                    <StatusPill tone={campSettings.enabled ? 'success' : 'neutral'} className="mt-2">
+                      {campSettings.enabled ? '캠프 ON' : '캠프 OFF'}
+                    </StatusPill>
+                  </div>
+                </div>
+
+                <ol className="space-y-2 rounded-xl border border-border/60 bg-secondary/20 px-4 py-3 text-sm leading-relaxed">
+                  <li><strong>1.</strong> 22:00에 「오늘 캠프 참여 시간 입력」 리마인드 메일 자동 발송</li>
+                  <li><strong>2.</strong> 멤버가 메일 링크에서 설문 작성 (멤버 홈에는 노출되지 않음)</li>
+                  <li><strong>3.</strong> 「참여함」→ 시간 입력 · 「오늘 출석 안 함」 선택 가능</li>
+                  <li><strong>4.</strong> 참여 5시간마다 벌점 0.25점 상쇄 (출석 안 함은 상쇄 없음)</li>
+                  <li><strong>5.</strong> 응답 집계는 <strong>세션</strong> 메뉴 → 캠프 일일 설문 패널</li>
+                </ol>
+
+                <div className="space-y-1.5">
+                  <Label>멤버 설문 링크 (메일 CTA와 동일)</Label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <code className="flex-1 break-all rounded-lg bg-secondary/50 px-3 py-2 text-xs">{campSurveyMemberLink}</code>
+                    <Button type="button" variant="outline" size="sm" asChild>
+                      <a href={campSurveyMemberLink} target="_blank" rel="noopener noreferrer">열기</a>
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2.5 text-xs">
+                  <div className="font-bold text-muted-foreground">오늘 기준 미리보기 일자</div>
+                  <div className="mt-1 font-medium">{formatCampTodayLabel()}</div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">활성화된 캠프가 없습니다. 세션 페이지에서 캠프 ON/OFF를 확인하세요.</p>
+            )}
+          </Panel>
+
+          {campSettings && (
+            <Panel title="리마인드 메일 미리보기" icon={Mail}>
+              <div className="space-y-4">
+                <p className="text-xs text-muted-foreground">
+                  {campTestMember?.full_name || '홍길동'}님 기준 · 실제 22:00 자동 발송과 동일한 HTML
+                </p>
+                {campPreviewHtml && (
+                  <iframe
+                    title="캠프 설문 리마인드 미리보기"
+                    srcDoc={campPreviewHtml}
+                    className="mx-auto block h-[560px] w-full rounded-xl border border-border/60 bg-[#eceff1]"
+                    sandbox="allow-popups allow-popups-to-escape-sandbox"
+                  />
+                )}
+                <Button
+                  className="w-full sm:w-auto"
+                  disabled={sendingCampTest || !campTestMember}
+                  onClick={() => void sendCampTestMail()}
+                >
+                  {sendingCampTest ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}
+                  테스트 발송 ({TEST_EMAIL_RECIPIENT})
+                </Button>
+                {!campTestMember && (
+                  <p className="text-xs text-destructive">멤버 관리에 {TEST_EMAIL_RECIPIENT} 이메일이 등록되어 있어야 테스트 발송할 수 있습니다.</p>
+                )}
+              </div>
+            </Panel>
+          )}
+
+          {campReminderLogs.length > 0 && (
+            <Panel title="최근 캠프 리마인드 발송" icon={Activity}>
+              <div className="space-y-2">
+                {campReminderLogs.slice(0, 10).map(log => (
+                  <div key={log.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/50 px-3 py-2 text-xs">
+                    <div>
+                      <p className="font-semibold">{log.email}</p>
+                      <p className="text-muted-foreground">{log.subject}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <StatusPill tone={log.status === 'sent' ? 'success' : 'danger'}>{log.status}</StatusPill>
+                      <span className="text-muted-foreground">
+                        {new Date(log.sent_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          )}
+        </div>
+      )}
+
       {activeTab === 'test' && (
         <Panel
           title="테스트 발송"
           icon={Send}
-          description="실제 세션·수신자 기준으로 자동 발송 메일과 동일한 HTML을 확인하고 발송합니다."
+          description={`실제 세션·수신자 기준으로 HTML을 확인하고 발송합니다. 테스트 발송은 ${TEST_EMAIL_RECIPIENT} 만 가능합니다.`}
         >
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -667,12 +908,12 @@ export default function AdminEmail() {
               />
             </div>
 
-            {previewHtml && (
+            {testPreviewHtml && (
               <div className="space-y-2">
                 <Label>실제 발송 미리보기 {previewMember ? `(${previewMember.full_name}님 기준)` : ''}</Label>
                 <iframe
                   title="테스트 발송 미리보기"
-                  srcDoc={previewHtml}
+                  srcDoc={testPreviewHtml}
                   className="mx-auto block h-[560px] w-full rounded-xl border border-border/60 bg-[#eceff1]"
                   sandbox="allow-popups allow-popups-to-escape-sandbox"
                 />

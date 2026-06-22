@@ -7,6 +7,7 @@ import {
   sendGmail,
 } from "../_shared/gmail.ts";
 import { buildEmailFromSession } from "../_shared/email-html-templates.ts";
+import { getMemberPortalToken, memberPortalUrl } from "../_shared/member-portal-link.ts";
 
 type CheckInRequest = {
   memberId: string;
@@ -72,6 +73,22 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "session not found" }, 404);
     }
 
+    const { data: attendance } = await supabase
+      .from("attendance_records")
+      .select("id, checked_in_at")
+      .eq("session_id", payload.sessionId)
+      .eq("member_id", payload.memberId)
+      .maybeSingle();
+
+    if (!attendance) {
+      return jsonResponse({ error: "Unauthorized: no check-in record" }, 403);
+    }
+
+    const checkedAt = new Date(attendance.checked_in_at || 0).getTime();
+    if (Date.now() - checkedAt > 15 * 60 * 1000) {
+      return jsonResponse({ error: "Unauthorized: check-in window expired" }, 403);
+    }
+
     const dedupeKey = `checkin:${payload.sessionId}:${payload.memberId}`;
     const { data: existing } = await supabase
       .from("email_send_logs")
@@ -83,11 +100,17 @@ Deno.serve(async (req) => {
       return jsonResponse({ skipped: true, reason: "already sent" });
     }
 
+    const portalToken = await getMemberPortalToken(supabase, profile.id);
     const { subject, html } = buildEmailFromSession(
       "checkin_complete",
       profile,
       session,
-      { checkedInAt: payload.checkedInAt, attendanceStatus: payload.status },
+      {
+        checkedInAt: payload.checkedInAt,
+        attendanceStatus: payload.status,
+        checkInLink: memberPortalUrl("checkin", { token: portalToken }),
+        absenceLink: memberPortalUrl("absence", { token: portalToken }),
+      },
     );
 
     const accessToken = await getGmailAccessToken();

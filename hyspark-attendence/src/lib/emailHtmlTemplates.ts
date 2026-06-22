@@ -10,7 +10,8 @@ export type EmailTemplateKind =
   | 'session_reminder_5d'
   | 'session_reminder_1d'
   | 'session_open'
-  | 'checkin_complete';
+  | 'checkin_complete'
+  | 'camp_daily_survey_reminder';
 
 export type AttendanceStatusLabel = 'present' | 'late' | 'unexcused_absent';
 
@@ -21,6 +22,9 @@ export interface EmailTemplateData {
   memberLink?: string;
   absenceLink?: string;
   checkInLink?: string;
+  campSurveyLink?: string;
+  campTitle?: string;
+  campDateRange?: string;
   venueName?: string;
   venueMapsUrl?: string;
   attendanceCode?: string;
@@ -34,6 +38,7 @@ export const EMAIL_KIND_LABELS: Record<EmailTemplateKind, string> = {
   session_reminder_1d: '1일 전 리마인드',
   session_open: '출석 오픈',
   checkin_complete: '출석 완료',
+  camp_daily_survey_reminder: '캠프 일일 설문',
 };
 
 export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatusLabel, string> = {
@@ -153,6 +158,15 @@ export const SAMPLE_EMAIL_DATA: Record<EmailTemplateKind, EmailTemplateData> = {
     memberLink: PUBLIC_URLS.member,
     checkedInAt: '2026년 6월 17일 (화) 15:03',
     attendanceStatus: 'present',
+  },
+  camp_daily_survey_reminder: {
+    memberName: '홍길동',
+    sessionTitle: '미니 스타트업 캠프',
+    sessionDateTime: '2026년 6월 22일 (월)',
+    memberLink: PUBLIC_URLS.member,
+    campSurveyLink: memberPortalUrl('camp-survey'),
+    campTitle: '미니 스타트업 캠프',
+    campDateRange: '2026-06-22 ~ 2026-06-26',
   },
 };
 
@@ -321,6 +335,8 @@ export function buildEmailSubject(kind: EmailTemplateKind, data: EmailTemplateDa
       return `[${APP_NAME}] 지금 출석체크 — ${data.sessionTitle}`;
     case 'checkin_complete':
       return `[${APP_NAME}] 출석 완료 — ${data.sessionTitle}`;
+    case 'camp_daily_survey_reminder':
+      return `[${APP_NAME}] 오늘 캠프 참여 시간 입력 — ${data.campTitle || data.sessionTitle}`;
   }
 }
 
@@ -364,7 +380,47 @@ export function buildEmailHtml(kind: EmailTemplateKind, data: EmailTemplateData)
         ].join(''),
       });
     }
+
+    case 'camp_daily_survey_reminder': {
+      const surveyLink = data.campSurveyLink || memberPortalUrl('camp-survey');
+      return emailShell({
+        headline: '오늘 캠프 참여 시간을 입력해 주세요',
+        salutation: data.memberName,
+        body: [
+          bodyText(`<strong style="color:${C.title};">${escapeHtml(data.campTitle || data.sessionTitle)}</strong> 오늘 참여하신 시간을 알려주세요.`),
+          infoCard([
+            { label: '캠프', value: data.campTitle || data.sessionTitle },
+            { label: '기간', value: data.campDateRange || '—' },
+            { label: '오늘', value: data.sessionDateTime },
+          ]),
+          bodyText('몇 시부터 몇 시까지 참여하셨는지 입력해 주세요. 참여 시간 5시간마다 벌점 0.25점이 상쇄됩니다.'),
+          primaryButton(surveyLink, '참여 시간 입력하기'),
+        ].join(''),
+      });
+    }
   }
+}
+
+export function buildCampSurveyReminderEmail(params: {
+  memberName: string;
+  campTitle: string;
+  campDateRange: string;
+  todayLabel: string;
+  campSurveyLink?: string;
+}) {
+  const data: EmailTemplateData = {
+    memberName: params.memberName,
+    sessionTitle: params.campTitle,
+    sessionDateTime: params.todayLabel,
+    memberLink: PUBLIC_URLS.member,
+    campSurveyLink: params.campSurveyLink || memberPortalUrl('camp-survey'),
+    campTitle: params.campTitle,
+    campDateRange: params.campDateRange,
+  };
+  return {
+    subject: buildEmailSubject('camp_daily_survey_reminder', data),
+    html: buildEmailHtml('camp_daily_survey_reminder', data),
+  };
 }
 
 export function formatSessionDateTime(startAt: string) {
@@ -406,7 +462,12 @@ export function buildEmailFromSession(
     attendance_code?: string | null;
     check_in_open_minutes?: number;
   },
-  extra?: { checkedInAt?: string; attendanceStatus?: AttendanceStatusLabel },
+  extra?: {
+    checkedInAt?: string;
+    attendanceStatus?: AttendanceStatusLabel;
+    absenceLink?: string;
+    checkInLink?: string;
+  },
 ) {
   const memberBase = PUBLIC_URLS.member;
   const showsVenue = kind !== 'checkin_complete';
@@ -415,8 +476,8 @@ export function buildEmailFromSession(
     sessionTitle: session.title,
     sessionDateTime: formatSessionDateTime(session.start_at),
     memberLink: memberBase,
-    absenceLink: memberPortalUrl('absence'),
-    checkInLink: memberPortalUrl('checkin'),
+    absenceLink: extra?.absenceLink || memberPortalUrl('absence'),
+    checkInLink: extra?.checkInLink || memberPortalUrl('checkin'),
     venueName: showsVenue ? resolveVenueDisplayName(session.venue_name) : undefined,
     venueMapsUrl: showsVenue ? resolveVenueMapsUrl(session) : undefined,
     attendanceCode: session.attendance_code || undefined,
