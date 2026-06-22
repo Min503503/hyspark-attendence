@@ -60,14 +60,14 @@ export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatusLabel, string> = {
   unexcused_absent: '결석',
 };
 
-/** Logo PNG 448×146 — width만 지정, height는 auto (비율 유지) */
+/** 메일 헤더 워드마크 448×146 — width만 지정, height auto */
 const LOGO_NATURAL_WIDTH = 448;
 const LOGO_NATURAL_HEIGHT = 146;
 const LOGO_DISPLAY_WIDTH = 154;
 const LOGO_DISPLAY_HEIGHT = Math.round((LOGO_DISPLAY_WIDTH * LOGO_NATURAL_HEIGHT) / LOGO_NATURAL_WIDTH);
 
 function brandLogoImg(logoUrl: string) {
-  return `<img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(APP_NAME)}" width="${LOGO_DISPLAY_WIDTH}" height="${LOGO_DISPLAY_HEIGHT}" border="0" style="display:block;width:${LOGO_DISPLAY_WIDTH}px;max-width:100%;height:auto;border:0;outline:none;line-height:100%;-ms-interpolation-mode:bicubic;" />`;
+  return `<img src="${escapeHtml(logoUrl)}" alt="하이스파크" width="${LOGO_DISPLAY_WIDTH}" height="${LOGO_DISPLAY_HEIGHT}" border="0" style="display:block;width:${LOGO_DISPLAY_WIDTH}px;max-width:100%;height:auto;border:0;outline:none;line-height:100%;-ms-interpolation-mode:bicubic;" />`;
 }
 
 /** Toss-style typography — Pretendard first, loaded via inline @font-face for email + preview */
@@ -237,10 +237,6 @@ function ctaBlock(href: string, label: string) {
   return `${primaryButton(href, label)}${fallbackLink(href)}`;
 }
 
-function textLink(href: string, label: string) {
-  return `<p style="margin:16px 0 0;font-family:${FONT_STACK};font-size:15px;line-height:1.6;color:${C.body};"><a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" style="font-family:${FONT_STACK};font-size:15px;font-weight:700;line-height:1.4;color:${C.primary};text-decoration:underline;text-underline-offset:3px;letter-spacing:-0.02em;">${escapeHtml(label)}</a></p>`;
-}
-
 function venueInlineMapLink(href: string) {
   return ` (<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" style="font-family:${FONT_STACK};font-size:16px;font-weight:600;line-height:1.5;color:${C.primary};text-decoration:underline;text-underline-offset:3px;letter-spacing:-0.02em;">네이버 지도에서 보기</a>)`;
 }
@@ -317,7 +313,7 @@ function emailShell(params: {
               </table>
               <h1 style="margin:0;font-family:${FONT_STACK};font-size:26px;font-weight:800;line-height:1.35;color:${C.title};letter-spacing:-0.03em;">${escapeHtml(params.headline)}</h1>
               ${subtitleLine(subtitle)}
-              <div style="margin-top:28px;">
+              <div style="margin-top:20px;">
                 ${params.body}
               </div>
             </td>
@@ -325,8 +321,8 @@ function emailShell(params: {
           <tr>
             <td style="padding:20px 40px 24px;background:${C.footerBg};font-family:${FONT_STACK};font-size:12px;line-height:1.65;color:${C.caption};text-align:center;letter-spacing:-0.01em;">
               본 메일은 발신 전용입니다.<br />
-              ${escapeHtml(APP_NAME)} Attendance · 하이스파크 학회 출결 시스템<br />
-              © ${new Date().getFullYear()} ${escapeHtml(APP_NAME)}
+              하이스파크 학회 출결 시스템<br />
+              © ${new Date().getFullYear()} 하이스파크 학회
             </td>
           </tr>
         </table>
@@ -342,29 +338,26 @@ function buildSessionReminderHtml(data: EmailTemplateData, daysBefore: 5 | 1) {
   const headline = daysBefore === 5 ? '다가오는 세션 안내' : '내일 세션이 있어요';
   const subtitle = `${data.memberName}님의 세션 안내`;
   const leadText = daysBefore === 5
-    ? `안녕하세요 ${escapeHtml(data.memberName)}님, <strong style="color:${C.title};">${escapeHtml(data.sessionDateTime)}</strong> 세션이 5일 뒤 예정되어 있어요.`
-    : `안녕하세요 ${escapeHtml(data.memberName)}님, <strong style="color:${C.title};">${escapeHtml(data.sessionDateTime)}</strong> 세션이 내일이에요.`;
+    ? `안녕하세요 ${escapeHtml(data.memberName)}님, <strong style="color:${C.title};">${escapeHtml(data.sessionDateTime)}</strong> 세션이 5일 뒤 예정되어 있습니다. 아래 일정을 확인해 주세요.`
+    : `안녕하세요 ${escapeHtml(data.memberName)}님, <strong style="color:${C.title};">${escapeHtml(data.sessionDateTime)}</strong> 세션이 내일입니다. 결석 예정이시면 사전에 등록해 주세요.`;
 
   return emailShell({
     headline,
     subtitle,
     salutation: data.memberName,
     body: [
-      bodyText(leadText),
-      bodyText('아래 일정과 장소를 확인해 주세요.'),
       infoTable([
         { label: '세션', value: data.sessionTitle },
         { label: '일시', value: data.sessionDateTime },
         sessionVenueRow(data.venueName, data.venueMapsUrl),
         { label: '출석 오픈', value: `세션 시작 ${data.checkInOpenMinutes ?? 15}분 전` },
       ]),
-      bodyText('이번 주에 결석 예정이신 분들은 출결 사이트에서 미리 등록해 주세요.'),
+      bodyText(leadText),
       bulletList([
         '결석 신청은 세션 시작 전까지 가능합니다.',
         '당일 불참 시에도 반드시 사전에 등록해 주세요.',
       ]),
-      textLink(absenceLink, '미리 결석 신청하기'),
-      fallbackLink(absenceLink),
+      ctaBlock(absenceLink, '미리 결석 신청하기'),
     ].filter(Boolean).join(''),
   });
 }
@@ -399,12 +392,12 @@ export function buildEmailHtml(kind: EmailTemplateKind, data: EmailTemplateData)
         subtitle: `${data.memberName}님의 출석 안내`,
         salutation: data.memberName,
         body: [
-          bodyText(`안녕하세요 ${escapeHtml(data.memberName)}님, <strong style="color:${C.title};">${escapeHtml(data.sessionTitle)}</strong> 출석이 시작됐어요. 강의실 화면의 코드를 입력해 주세요.`),
           infoTable([
             { label: '세션', value: data.sessionTitle },
             { label: '일시', value: data.sessionDateTime },
             sessionVenueRow(data.venueName, data.venueMapsUrl),
           ]),
+          bodyText(`안녕하세요 ${escapeHtml(data.memberName)}님, <strong style="color:${C.title};">${escapeHtml(data.sessionTitle)}</strong> 출석이 시작됐습니다. 강의실 화면의 코드를 입력해 주세요.`),
           ctaBlock(checkInLink, '바로 출석체크하기'),
         ].filter(Boolean).join(''),
       });
@@ -418,12 +411,12 @@ export function buildEmailHtml(kind: EmailTemplateKind, data: EmailTemplateData)
         subtitle: `${data.memberName}님의 출석 결과`,
         salutation: data.memberName,
         body: [
-          bodyText(`안녕하세요 ${escapeHtml(data.memberName)}님, <strong style="color:${C.title};">${escapeHtml(data.sessionTitle)}</strong> 체크인이 기록됐어요.`),
           infoTable([
             { label: '세션', value: data.sessionTitle },
             { label: '체크인 시간', value: data.checkedInAt || '—' },
             { label: '결과', value: statusLabel, accent: statusColor },
           ]),
+          bodyText(`안녕하세요 ${escapeHtml(data.memberName)}님, <strong style="color:${C.title};">${escapeHtml(data.sessionTitle)}</strong> 체크인이 기록됐습니다.`),
         ].join(''),
       });
     }
@@ -435,16 +428,16 @@ export function buildEmailHtml(kind: EmailTemplateKind, data: EmailTemplateData)
         subtitle: `${data.memberName}님의 캠프 설문`,
         salutation: data.memberName,
         body: [
-          bodyText(`안녕하세요 ${escapeHtml(data.memberName)}님, <strong style="color:${C.title};">${escapeHtml(data.campTitle || data.sessionTitle)}</strong> 오늘 참여하신 시간을 알려주세요.`),
           infoTable([
             { label: '캠프', value: data.campTitle || data.sessionTitle },
             { label: '기간', value: data.campDateRange || '—' },
             { label: '오늘', value: data.sessionDateTime },
           ]),
-          bodyText('몇 시부터 몇 시까지 참여하셨는지 입력해 주세요. 참여 시간 5시간마다 벌점 0.25점이 상쇄됩니다.'),
+          bodyText(`안녕하세요 ${escapeHtml(data.memberName)}님, <strong style="color:${C.title};">${escapeHtml(data.campTitle || data.sessionTitle)}</strong> 오늘 참여하신 시간을 알려주세요. 몇 시부터 몇 시까지 참여하셨는지 입력해 주세요.`),
           bulletList([
             '30분 단위로 드래그해 선택할 수 있습니다.',
             '끊어진 시간(예: 12–1시, 2–5시)도 함께 입력 가능합니다.',
+            '참여 시간 5시간마다 벌점 0.25점이 상쇄됩니다.',
           ]),
           ctaBlock(surveyLink, '참여 시간 입력하기'),
         ].join(''),

@@ -7,7 +7,7 @@ export const PUBLIC_URLS = {
   member: 'https://hysparkpre-member.web.app',
   about: 'https://hysparkpre-member.web.app/about.html',
   privacy: 'https://hysparkpre-member.web.app/privacy.html',
-  /** Supabase Storage — Firebase Hosting 장애 시에도 메일에서 로고 로드 가능 */
+  /** Supabase Storage — 메일 헤더 워드마크 (키다리은행형) */
   emailLogo:
     'https://lwbjprzrnmlnmzlxiwrv.supabase.co/storage/v1/object/public/brand-assets/hyspark-logo.png',
 } as const;

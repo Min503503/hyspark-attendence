@@ -29,9 +29,11 @@ describe('emailHtmlTemplates', () => {
     expect(html).not.toContain('hyspark-attendance-member.web.app/hyspark-logo.png');
   });
 
-  it('5일 전 리마인드: 장소·지도·결석 신청 링크 포함', () => {
+  it('5일 전 리마인드: 장소·지도·결석 신청 버튼 포함', () => {
     const html = buildEmailHtml('session_reminder_5d', SAMPLE_EMAIL_DATA.session_reminder_5d);
     expect(html).toContain('미리 결석 신청하기');
+    expect(html).toContain('class="email-btn"');
+    expect(html).toMatch(/일시[\s\S]*안녕하세요/);
     expect(html).toContain('네이버 지도에서 보기');
     expect(html).toContain('세션 장소');
     expect(html).toMatch(/일시[\s\S]*세션 장소[\s\S]*출석 오픈/);
@@ -173,6 +175,6 @@ describe('emailHtmlTemplates', () => {
     expect(html).toContain('자세한 내용은 카톡을 확인해 주세요.');
     expect(html).toContain(PUBLIC_URLS.emailLogo);
     expect(html).toContain('발신 전용');
-    expect(html).toContain('HySpark Attendance');
+    expect(html).toContain('하이스파크 학회 출결 시스템');
   });
 });
