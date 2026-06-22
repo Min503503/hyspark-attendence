@@ -7,6 +7,7 @@ import {
   expandCampResponseToSlots,
   formatCampTimeSlotsSummary,
   pickDefaultCampSurveyDate,
+  isCampDaySubmittable,
 } from '@/lib/campSurvey';
 
 describe('campSurvey time slots', () => {
@@ -39,12 +40,20 @@ describe('campSurvey time slots', () => {
     ]);
   });
 
-  it('pickDefaultCampSurveyDate prefers today when eligible', () => {
+  it('pickDefaultCampSurveyDate prefers earliest unsubmitted eligible day', () => {
     const days = buildCampWeekdays('2026-06-22', '2026-06-26').map(date => ({
       date,
       weekday_label: '월',
     }));
-    expect(pickDefaultCampSurveyDate(days, '2026-06-24')).toBe('2026-06-24');
-    expect(pickDefaultCampSurveyDate(days, '2026-06-28')).toBe('2026-06-26');
+    expect(pickDefaultCampSurveyDate(days, '2026-06-24')).toBe('2026-06-22');
+    const withMondayDone = days.map(day => (
+      day.date === '2026-06-22' ? { ...day, response: { id: '1', attended: true, from_time: '10:00', to_time: '11:00', duration_minutes: 60, demerit_credit: 0, submitted_at: 'x' } } : day
+    ));
+    expect(pickDefaultCampSurveyDate(withMondayDone, '2026-06-24')).toBe('2026-06-23');
+  });
+
+  it('isCampDaySubmittable blocks future camp days', () => {
+    expect(isCampDaySubmittable('2026-06-22', '2026-06-22')).toBe(true);
+    expect(isCampDaySubmittable('2026-06-23', '2026-06-22')).toBe(false);
   });
 });

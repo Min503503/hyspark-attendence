@@ -60,13 +60,19 @@ export function formatCampDayShort(date: string): string {
   return `${Number(month)}/${Number(day)}`;
 }
 
-/** 기본 선택일: 오늘(캠프 평일·제출 가능) → 없으면 가장 최근 제출 가능일 */
+/** 기본 선택일: 미제출 평일 중 가장 이른 날 → 없으면 오늘 → 없으면 마지막 제출 가능일 */
 export function pickDefaultCampSurveyDate(days: CampSurveyDay[], todayKst: string): string {
   const eligible = days.filter(day => day.date <= todayKst);
   if (eligible.length === 0) return days[0]?.date ?? todayKst;
+  const unsubmitted = eligible.find(day => !day.response);
+  if (unsubmitted) return unsubmitted.date;
   const todayMatch = eligible.find(day => day.date === todayKst);
   if (todayMatch) return todayMatch.date;
   return eligible[eligible.length - 1].date;
+}
+
+export function isCampDaySubmittable(dayDate: string, todayKst: string): boolean {
+  return Boolean(todayKst && dayDate <= todayKst);
 }
 
 export function applyCampDayResponse(

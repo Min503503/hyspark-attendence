@@ -15,6 +15,7 @@ import {
   formatCampDayShort,
   formatCampDuration,
   formatMinutesToTime,
+  isCampDaySubmittable,
   parseTimeToMinutes,
   pickDefaultCampSurveyDate,
   CAMP_SLOT_MINUTES,
@@ -59,8 +60,9 @@ export default function CampSurveyCard({ memberId, focusOnMount = false, onSaved
   );
   const selectedLabel = selectedDay?.weekday_label ?? '';
   const isFutureDay = Boolean(selectedDate && todayKst && selectedDate > todayKst);
+  const submittableDayCount = campDays.filter(day => isCampDaySubmittable(day.date, todayKst)).length;
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (preserveDate?: string) => {
     setLoading(true);
     const { data, error } = await supabase.rpc('get_camp_survey_context', {
       p_profile_id: memberId,
@@ -76,7 +78,11 @@ export default function CampSurveyCard({ memberId, focusOnMount = false, onSaved
     setContext(ctx);
 
     if (ctx.active && ctx.camp && ctx.days?.length) {
-      const defaultDate = pickDefaultCampSurveyDate(ctx.days, ctx.today_kst || ctx.days[ctx.days.length - 1].date);
+      const today = ctx.today_kst || ctx.days[ctx.days.length - 1].date;
+      const preserved = preserveDate && ctx.days.some(day => day.date === preserveDate)
+        ? preserveDate
+        : null;
+      const defaultDate = preserved || pickDefaultCampSurveyDate(ctx.days, today);
       const day = ctx.days.find(item => item.date === defaultDate);
       setSelectedDate(defaultDate);
       applyDayToForm(day, ctx.camp, setMode, setSelectedSlots);
@@ -90,8 +96,8 @@ export default function CampSurveyCard({ memberId, focusOnMount = false, onSaved
   }, [load]);
 
   const handleSelectDay = (day: CampSurveyDay) => {
-    if (todayKst && day.date > todayKst) {
-      toast.error('아직 오지 않은 날짜는 제출할 수 없습니다.');
+    if (!isCampDaySubmittable(day.date, todayKst)) {
+      toast.error(`${day.weekday_label}요일(${formatCampDayShort(day.date)})은 해당 날짜가 되면 입력할 수 있어요.`);
       return;
     }
     setSelectedDate(day.date);
@@ -156,7 +162,7 @@ export default function CampSurveyCard({ memberId, focusOnMount = false, onSaved
       title: '제출 완료',
       description: result.message || `${selectedLabel}요일 참여 시간이 저장되었습니다.`,
     });
-    await load();
+    await load(selectedDate);
     onSaved?.();
   };
 
@@ -204,10 +210,16 @@ export default function CampSurveyCard({ memberId, focusOnMount = false, onSaved
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-2">
           <p className="text-[11px] font-bold text-muted-foreground">날짜 선택 (월~금)</p>
+          {todayKst && submittableDayCount < campDays.length && (
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              오늘(<strong className="text-foreground">{formatCampDayShort(todayKst)}</strong>)까지 제출할 수 있어요.
+              이후 요일은 해당 날짜가 되면 선택·제출됩니다.
+            </p>
+          )}
           <div className="grid grid-cols-5 gap-2">
             {campDays.map(day => {
               const isSelected = day.date === selectedDate;
-              const isFuture = Boolean(todayKst && day.date > todayKst);
+              const isFuture = !isCampDaySubmittable(day.date, todayKst);
               const hasResponse = Boolean(day.response);
               return (
                 <button
@@ -219,8 +231,10 @@ export default function CampSurveyCard({ memberId, focusOnMount = false, onSaved
                     'relative rounded-xl border-2 px-1 py-2.5 text-center transition-all duration-200',
                     isSelected
                       ? 'border-primary bg-primary text-primary-foreground shadow-md'
-                      : 'border-border/40 bg-secondary/30 text-foreground hover:bg-secondary/55',
-                    isFuture && 'cursor-not-allowed opacity-40',
+                      : isFuture
+                        ? 'border-border/25 bg-secondary/15 text-muted-foreground/60'
+                        : 'border-border/40 bg-secondary/30 text-foreground hover:bg-secondary/55',
+                    isFuture && 'cursor-not-allowed',
                   )}
                 >
                   <span className="block text-sm font-black">{day.weekday_label}</span>
@@ -230,6 +244,9 @@ export default function CampSurveyCard({ memberId, focusOnMount = false, onSaved
                   )}>
                     {formatCampDayShort(day.date)}
                   </span>
+                  {isFuture && (
+                    <span className="mt-1 block text-[9px] font-medium opacity-80">예정</span>
+                  )}
                   {hasResponse && (
                     <span className={cn(
                       'absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full',
