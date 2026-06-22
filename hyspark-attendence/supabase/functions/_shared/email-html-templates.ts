@@ -60,9 +60,9 @@ export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatusLabel, string> = {
   unexcused_absent: '결석',
 };
 
-/** Logo PNG is 638×326 — keep aspect ratio */
-const LOGO_WIDTH = 108;
-const LOGO_HEIGHT = 55;
+/** Logo PNG is 448×146 (spark + wordmark) — keep aspect ratio */
+const LOGO_WIDTH = 140;
+const LOGO_HEIGHT = 46;
 
 /** Toss-style typography — Pretendard first, loaded via inline @font-face for email + preview */
 const FONT_STACK = 'Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
@@ -305,8 +305,7 @@ function emailShell(params: {
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 <tr>
                   <td style="padding:0 0 24px;vertical-align:middle;">
-                    <img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(APP_NAME)}" width="${LOGO_WIDTH}" height="${LOGO_HEIGHT}" style="display:inline-block;vertical-align:middle;width:${LOGO_WIDTH}px;height:${LOGO_HEIGHT}px;max-width:100%;border:0;outline:none;" />
-                    <span style="display:inline-block;vertical-align:middle;margin-left:10px;font-family:${FONT_STACK};font-size:16px;font-weight:700;color:${C.primaryDark};letter-spacing:-0.02em;">${escapeHtml(APP_NAME)}</span>
+                    <img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(APP_NAME)}" width="${LOGO_WIDTH}" height="${LOGO_HEIGHT}" style="display:block;width:${LOGO_WIDTH}px;height:${LOGO_HEIGHT}px;max-width:100%;border:0;outline:none;" />
                   </td>
                 </tr>
               </table>
