@@ -47,9 +47,15 @@ export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatusLabel, string> = {
   unexcused_absent: '결석',
 };
 
-/** Logo PNG is 448×146 (spark + wordmark) — keep aspect ratio */
-const LOGO_WIDTH = 140;
-const LOGO_HEIGHT = 46;
+/** Logo PNG 448×146 — width만 지정, height는 auto (비율 유지) */
+const LOGO_NATURAL_WIDTH = 448;
+const LOGO_NATURAL_HEIGHT = 146;
+const LOGO_DISPLAY_WIDTH = 154;
+const LOGO_DISPLAY_HEIGHT = Math.round((LOGO_DISPLAY_WIDTH * LOGO_NATURAL_HEIGHT) / LOGO_NATURAL_WIDTH);
+
+function brandLogoImg(logoUrl: string) {
+  return `<img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(APP_NAME)}" width="${LOGO_DISPLAY_WIDTH}" height="${LOGO_DISPLAY_HEIGHT}" border="0" style="display:block;width:${LOGO_DISPLAY_WIDTH}px;max-width:100%;height:auto;border:0;outline:none;line-height:100%;-ms-interpolation-mode:bicubic;" />`;
+}
 
 /** Toss-style typography — Pretendard first, loaded via inline @font-face for email + preview */
 const FONT_STACK = 'Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
@@ -291,8 +297,8 @@ function emailShell(params: {
             <td style="padding:40px 40px 32px;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 <tr>
-                  <td style="padding:0 0 24px;vertical-align:middle;">
-                    <img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(APP_NAME)}" width="${LOGO_WIDTH}" height="${LOGO_HEIGHT}" style="display:block;width:${LOGO_WIDTH}px;height:${LOGO_HEIGHT}px;max-width:100%;border:0;outline:none;" />
+                  <td align="left" style="padding:0 0 20px;vertical-align:top;">
+                    ${brandLogoImg(logoUrl)}
                   </td>
                 </tr>
               </table>
