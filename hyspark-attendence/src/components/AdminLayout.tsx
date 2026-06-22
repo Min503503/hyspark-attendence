@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link, Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '@/contexts/AppContext';
 import { LayoutDashboard, Users, CalendarDays, LogOut, BarChart3, Mail, Menu } from 'lucide-react';
-import hysparkLogo from '@/assets/hyspark-logo.png';
 import { APP_NAME } from '@/lib/brand';
 import { lockAdminSession } from '@/components/AdminGate';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -62,7 +61,7 @@ export default function AdminLayout() {
       <aside className="hidden w-[248px] shrink-0 flex-col border-r border-border/60 bg-background lg:flex">
         <div className="px-5 py-6">
           <Link to="/admin" className="app-focus-ring flex items-center gap-3 rounded-xl">
-            <img src={hysparkLogo} alt={APP_NAME} className="h-9 w-auto max-w-[72px] object-contain" />
+            <img src="/hyspark-email-logo.png" alt="" className="h-9 w-auto max-w-[72px] object-contain" />
             <div>
               <span className="block text-sm font-extrabold tracking-tight text-foreground">{APP_NAME}</span>
               <span className="mt-0.5 block text-[11px] font-semibold text-muted-foreground">운영 콘솔</span>
@@ -111,7 +110,7 @@ export default function AdminLayout() {
               <SheetContent side="right" className="flex w-[min(100vw-2rem,320px)] flex-col p-0">
                 <SheetHeader className="border-b border-border/60 px-5 py-5 text-left">
                   <SheetTitle className="flex items-center gap-3">
-                    <img src={hysparkLogo} alt={APP_NAME} className="h-8 w-auto max-w-[64px] object-contain" />
+                    <img src="/hyspark-email-logo.png" alt="" className="h-8 w-auto max-w-[64px] object-contain" />
                     <span>{APP_NAME}</span>
                   </SheetTitle>
                 </SheetHeader>
