@@ -117,11 +117,13 @@ export function SectionHeader({
 }
 
 export function Surface({
+  id,
   children,
   className,
   style,
   brand = false,
 }: {
+  id?: string;
   children: ReactNode;
   className?: string;
   style?: CSSProperties;
@@ -129,6 +131,7 @@ export function Surface({
 }) {
   return (
     <div
+      id={id}
       className={cn(
         'relative overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]',
         className,
@@ -142,6 +145,7 @@ export function Surface({
 }
 
 export function Panel({
+  id,
   title,
   description,
   icon: Icon,
@@ -151,6 +155,7 @@ export function Panel({
   bodyClassName,
   style,
 }: {
+  id?: string;
   title?: string;
   description?: ReactNode;
   icon?: LucideIcon;
@@ -161,7 +166,7 @@ export function Panel({
   style?: CSSProperties;
 }) {
   return (
-    <Surface className={className} style={style}>
+    <Surface id={id} className={className} style={style}>
       {title && (
         <div className="flex items-start justify-between gap-3 border-b border-border/60 px-5 py-4">
           <div className="min-w-0">

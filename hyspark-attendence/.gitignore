@@ -13,6 +13,7 @@ dist-admin
 dist-member
 dist-ssr
 *.local
+*.tsbuildinfo
 .env
 .env.*
 !.env.example
@@ -40,3 +41,4 @@ scripts/.migration-export
 scripts/.migration-import-batches.json
 scripts/.migration-import-sql
 scripts/gmail/.venv
+src/assets/*.bak

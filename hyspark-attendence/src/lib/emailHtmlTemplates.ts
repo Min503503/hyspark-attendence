@@ -6,12 +6,22 @@ import {
   resolveVenueMapsUrl,
 } from '@/lib/sessionVenue';
 
-export type EmailTemplateKind =
+export type SessionEmailTemplateKind =
   | 'session_reminder_5d'
   | 'session_reminder_1d'
   | 'session_open'
-  | 'checkin_complete'
+  | 'checkin_complete';
+
+export type EmailTemplateKind =
+  | SessionEmailTemplateKind
   | 'camp_daily_survey_reminder';
+
+export const SESSION_EMAIL_TEMPLATE_KINDS = [
+  'session_reminder_5d',
+  'session_reminder_1d',
+  'session_open',
+  'checkin_complete',
+] as const satisfies readonly SessionEmailTemplateKind[];
 
 export type AttendanceStatusLabel = 'present' | 'late' | 'unexcused_absent';
 
@@ -482,7 +492,7 @@ export function formatCheckInDateTime(iso: string) {
 export { resolveVenueDisplayName, resolveVenueMapsUrl, VENUE_MISSING_PLACEHOLDER } from '@/lib/sessionVenue';
 
 export function buildEmailFromSession(
-  kind: EmailTemplateKind,
+  kind: SessionEmailTemplateKind,
   profile: { full_name: string },
   session: {
     title: string;

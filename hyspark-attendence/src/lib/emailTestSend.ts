@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { invokeWithAdminToken } from '@/lib/adminApi';
 import {
-  EmailTemplateKind,
+  SessionEmailTemplateKind,
   buildEmailFromSession,
 } from '@/lib/emailHtmlTemplates';
 import { memberPortalUrlForProfile } from '@/lib/memberPortalToken';
@@ -9,7 +9,7 @@ import type { MemberWithSummary, Session } from '@/types';
 import { filterTestEmailRecipients } from '@/lib/emailTestPolicy';
 
 async function buildPersonalizedEmail(
-  kind: EmailTemplateKind,
+  kind: SessionEmailTemplateKind,
   member: MemberWithSummary,
   session: Session,
   checkInExtra?: { checkedInAt: string; attendanceStatus: 'present' | 'late' | 'unexcused_absent' },
@@ -40,7 +40,7 @@ async function buildPersonalizedEmail(
 }
 
 export async function sendTemplateEmails(params: {
-  kind: EmailTemplateKind;
+  kind: SessionEmailTemplateKind;
   session: Session;
   members: MemberWithSummary[];
   ruleId?: string | null;
@@ -97,7 +97,7 @@ export async function sendTemplateEmails(params: {
     };
   }));
 
-  const { data, error } = await invokeWithAdminToken('send-member-email', {
+  const { data, error } = await invokeWithAdminToken<{ sent?: number; error?: string }>('send-member-email', {
     body: {
       messages,
       ruleId: ruleId || null,
@@ -112,7 +112,7 @@ export async function sendTemplateEmails(params: {
 }
 
 export function buildPreviewHtml(
-  kind: EmailTemplateKind,
+  kind: SessionEmailTemplateKind,
   session: Session,
   memberName: string,
   checkInExtra?: { checkedInAt: string; attendanceStatus: 'present' | 'late' | 'unexcused_absent' },
@@ -136,7 +136,7 @@ export function buildPreviewHtml(
 
 /** Admin 미리보기·테스트 발송용 — 수신 멤버별 m= 토큰 링크 포함 */
 export async function buildPreviewHtmlAsync(
-  kind: EmailTemplateKind,
+  kind: SessionEmailTemplateKind,
   session: Session,
   member: MemberWithSummary,
   checkInExtra?: { checkedInAt: string; attendanceStatus: 'present' | 'late' | 'unexcused_absent' },

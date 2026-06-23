@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import MemberHome from '@/pages/MemberHome';
 import MemberCampSurvey from '@/pages/MemberCampSurvey';
-import { APP_NAME, APP_TAGLINE } from '@/lib/brand';
+import { APP_NAME } from '@/lib/brand';
 import SessionPhaseBar from '@/components/member/SessionPhaseBar';
 import {
   findRelevantSession,
@@ -99,6 +99,7 @@ export default function Index() {
   const memberIntent = intent === 'absence' || intent === 'checkin' || intent === 'camp-survey'
     ? intent
     : null;
+  const memberHomeIntent = memberIntent === 'camp-survey' ? null : memberIntent;
 
   const clearIntent = () => {
     if (!searchParams.has('intent')) return;
@@ -116,11 +117,7 @@ export default function Index() {
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col">
         <header className="flex shrink-0 items-center justify-between px-4 py-3">
           <Link to="/" className="app-focus-ring flex items-center gap-2 rounded-lg">
-            <img src={hysparkLogo} alt={APP_NAME} className="h-8 w-8 object-contain" />
-            <div>
-              <p className="text-sm font-extrabold leading-none tracking-tight">{APP_NAME}</p>
-              <p className="mt-0.5 text-[10px] font-medium text-muted-foreground">{APP_TAGLINE}</p>
-            </div>
+            <img src={hysparkLogo} alt={APP_NAME} className="h-8 w-auto" />
           </Link>
           {isMemberSignedIn && (
             <button
@@ -141,7 +138,7 @@ export default function Index() {
               본인 계정으로 연결하는 중…
             </div>
           ) : isMemberSignedIn ? (
-            <MemberHome initialIntent={memberIntent} onIntentHandled={clearIntent} />
+            <MemberHome initialIntent={memberHomeIntent} onIntentHandled={clearIntent} />
           ) : (
             <div className="flex flex-col px-4 pb-5 pt-1">
               <section className="member-card overflow-hidden p-4 shadow-md shadow-primary/5">

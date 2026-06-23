@@ -14,7 +14,8 @@ import { PUBLIC_URLS } from '@/lib/brand';
 import { GMAIL_SENDER } from '@/lib/mail';
 import {
   EMAIL_KIND_LABELS,
-  EmailTemplateKind,
+  SESSION_EMAIL_TEMPLATE_KINDS,
+  SessionEmailTemplateKind,
   SAMPLE_EMAIL_DATA,
   buildEmailSubject,
   buildManualEmailHtml,
@@ -50,17 +51,12 @@ const TEST_SESSION_PREFIX = '[테스트]';
 import { cn } from '@/lib/utils';
 import type { Session } from '@/types';
 
-const TEST_KINDS: EmailTemplateKind[] = [
-  'session_reminder_5d',
-  'session_reminder_1d',
-  'session_open',
-  'checkin_complete',
-];
+const TEST_KINDS: readonly SessionEmailTemplateKind[] = SESSION_EMAIL_TEMPLATE_KINDS;
 
 function injectPreviewLogo(html: string) {
   if (typeof window === 'undefined') return html;
   const logoUrl = `${window.location.origin}/hyspark-email-logo.png`;
-  return html.replaceAll(PUBLIC_URLS.emailLogo, logoUrl);
+  return html.split(PUBLIC_URLS.emailLogo).join(logoUrl);
 }
 
 function formatRelativeTime(iso: string): string {
@@ -73,7 +69,7 @@ function formatRelativeTime(iso: string): string {
   return new Date(iso).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
 }
 
-function previewSessionForKind(kind: EmailTemplateKind, sessions: Session[]): Session | null {
+function previewSessionForKind(kind: SessionEmailTemplateKind, sessions: Session[]): Session | null {
   const real = sessions.filter(
     session => !session.title.startsWith(TEST_SESSION_PREFIX) && session.status !== 'archived',
   );
@@ -96,11 +92,11 @@ export default function AdminEmail() {
   const [loading, setLoading] = useState(true);
   const [runningAutomation, setRunningAutomation] = useState(false);
   const [activeTab, setActiveTab] = useState('automation');
-  const [selectedRuleKind, setSelectedRuleKind] = useState<EmailTemplateKind>('session_reminder_5d');
+  const [selectedRuleKind, setSelectedRuleKind] = useState<SessionEmailTemplateKind>('session_reminder_5d');
   const [automationPreviewMemberId, setAutomationPreviewMemberId] = useState('');
   const [togglingRuleId, setTogglingRuleId] = useState<string | null>(null);
 
-  const [testKind, setTestKind] = useState<EmailTemplateKind>('session_reminder_5d');
+  const [testKind, setTestKind] = useState<SessionEmailTemplateKind>('session_reminder_5d');
   const [testSessionId, setTestSessionId] = useState('');
   const [testRecipientIds, setTestRecipientIds] = useState<string[]>([]);
   const [sendingTest, setSendingTest] = useState(false);
@@ -204,6 +200,8 @@ export default function AdminEmail() {
       venue_name: SAMPLE_EMAIL_DATA[selectedRuleKind].venueName,
       venue_map_url: SAMPLE_EMAIL_DATA[selectedRuleKind].venueMapsUrl,
       check_in_open_minutes: SAMPLE_EMAIL_DATA[selectedRuleKind].checkInOpenMinutes ?? 15,
+      attendance_deadline_minutes: 10,
+      late_deadline_minutes: 30,
       geofence_radius_m: 100,
       session_code: 'sample',
       attendance_code: null,
@@ -385,14 +383,17 @@ export default function AdminEmail() {
     toast.success(nextEnabled ? `${rule.name} 자동 발송을 켰습니다.` : `${rule.name} 자동 발송을 껐습니다.`);
   };
 
-  const selectRuleKind = (kind: EmailTemplateKind) => {
+  const selectRuleKind = (kind: SessionEmailTemplateKind) => {
     setSelectedRuleKind(kind);
     setTestKind(kind);
   };
 
   const runAutomationNow = async () => {
     setRunningAutomation(true);
-    const { data, error } = await invokeWithAdminToken('auto-open-sessions', {
+    const { data, error } = await invokeWithAdminToken<{
+      error?: string;
+      emailAutomation?: { sent?: number; skipped?: number; failed?: number };
+    }>('auto-open-sessions', {
       body: { trigger_source: 'admin_manual' },
     });
     setRunningAutomation(false);
@@ -406,7 +407,7 @@ export default function AdminEmail() {
       return;
     }
 
-    const email = data?.emailAutomation as { sent?: number; skipped?: number; failed?: number } | undefined;
+    const email = data?.emailAutomation;
     toast.success(
       `자동화 완료 · 발송 ${email?.sent ?? 0} · 스킵 ${email?.skipped ?? 0} · 실패 ${email?.failed ?? 0}`,
     );
@@ -464,7 +465,7 @@ export default function AdminEmail() {
     }
 
     setSendingManual(true);
-    const { data, error } = await invokeWithAdminToken('send-member-email', {
+    const { data, error } = await invokeWithAdminToken<{ sent?: number; error?: string }>('send-member-email', {
       body: {
         recipientIds: manualRecipientIds,
         subject: manualSubject.trim(),
@@ -483,7 +484,7 @@ export default function AdminEmail() {
       return;
     }
 
-    toast.success(`${data.sent}명에게 발송했습니다.`);
+    toast.success(`${data.sent ?? manualRecipientIds.length}명에게 발송했습니다.`);
     setManualSubject('');
     setManualBody('');
     load();
@@ -875,7 +876,7 @@ export default function AdminEmail() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>발송 규칙</Label>
-                <Select value={testKind} onValueChange={value => setTestKind(value as EmailTemplateKind)}>
+                <Select value={testKind} onValueChange={value => setTestKind(value as SessionEmailTemplateKind)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {TEST_KINDS.map(kind => (

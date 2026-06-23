@@ -40,7 +40,7 @@ export default function AdminGate({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen items-center justify-center bg-[#F2F4F6] px-4 py-10">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <img src={hysparkLogo} alt="HySpark" className="mx-auto h-10 w-auto max-w-[120px] object-contain" />
+          <img src={hysparkLogo} alt="HySpark" className="mx-auto h-10 w-auto" />
           <p className="mt-4 text-2xl font-extrabold tracking-tight text-foreground">운영 콘솔</p>
           <p className="mt-2 text-sm text-muted-foreground">관리자 비밀번호를 입력해 주세요.</p>
         </div>

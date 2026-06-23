@@ -3,7 +3,7 @@ import { LogOut } from 'lucide-react';
 import hysparkLogo from '@/assets/hyspark-logo.png';
 import { useApp } from '@/contexts/AppContext';
 import CampSurveyCard from '@/components/member/CampSurveyCard';
-import { APP_NAME, APP_TAGLINE } from '@/lib/brand';
+import { APP_NAME } from '@/lib/brand';
 
 /** 메일 링크(intent=camp-survey) 전용 — 멤버 홈에는 노출하지 않음 */
 export default function MemberCampSurvey() {
@@ -14,11 +14,7 @@ export default function MemberCampSurvey() {
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col">
         <header className="flex shrink-0 items-center justify-between px-4 py-3">
           <Link to="/" className="app-focus-ring flex items-center gap-2 rounded-lg">
-            <img src={hysparkLogo} alt={APP_NAME} className="h-8 w-8 object-contain" />
-            <div>
-              <p className="text-sm font-extrabold leading-none tracking-tight">{APP_NAME}</p>
-              <p className="mt-0.5 text-[10px] font-medium text-muted-foreground">{APP_TAGLINE}</p>
-            </div>
+            <img src={hysparkLogo} alt={APP_NAME} className="h-8 w-auto" />
           </Link>
           <button
             type="button"

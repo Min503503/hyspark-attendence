@@ -1,4 +1,4 @@
-import type { EmailTemplateKind } from '@/lib/emailHtmlTemplates';
+import type { SessionEmailTemplateKind } from '@/lib/emailHtmlTemplates';
 import type { EmailAutomationRule } from '@/lib/emailAutomation';
 import type { Session } from '@/types';
 
@@ -72,7 +72,7 @@ export function computeSessionOpenSendAt(session: Pick<Session, 'start_at' | 'ch
 }
 
 export function computeAutomationSendAt(
-  kind: EmailTemplateKind,
+  kind: SessionEmailTemplateKind,
   session: Pick<Session, 'start_at' | 'check_in_open_minutes' | 'attendance_code_issued_at' | 'status' | 'attendance_code_status'>,
 ): Date | null {
   switch (kind) {
@@ -100,7 +100,7 @@ export function computeAutomationSendAtFromRule(
   return null;
 }
 
-export const AUTOMATION_SCHEDULE_POLICY: Record<EmailTemplateKind, string> = {
+export const AUTOMATION_SCHEDULE_POLICY: Record<SessionEmailTemplateKind, string> = {
   session_reminder_5d: '세션 5일 전 주 월요일 오전 10:00',
   session_reminder_1d: '세션 시작 24시간 전',
   session_open: '출석 코드 활성화 직후',
@@ -120,7 +120,7 @@ export function formatAutomationSendTime(date: Date): string {
 }
 
 export function describeAutomationSendForSession(
-  kind: EmailTemplateKind,
+  kind: SessionEmailTemplateKind,
   session: Pick<Session, 'title' | 'start_at' | 'check_in_open_minutes' | 'attendance_code_issued_at' | 'status' | 'attendance_code_status'>,
   now = new Date(),
 ): string {

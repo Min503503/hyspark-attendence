@@ -10,10 +10,53 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.4"
+    PostgrestVersion: "14.5"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
+      admin_sessions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          token?: string
+        }
+        Relationships: []
+      }
       attendance_records: {
         Row: {
           check_in_lat: number | null
@@ -102,6 +145,99 @@ export type Database = {
           },
         ]
       }
+      camp_daily_responses: {
+        Row: {
+          attended: boolean
+          camp_id: string
+          demerit_credit: number
+          duration_minutes: number
+          from_time: string
+          id: string
+          profile_id: string
+          response_date: string
+          submitted_at: string
+          time_slots: string[] | null
+          to_time: string
+        }
+        Insert: {
+          attended?: boolean
+          camp_id: string
+          demerit_credit?: number
+          duration_minutes: number
+          from_time: string
+          id?: string
+          profile_id: string
+          response_date: string
+          submitted_at?: string
+          time_slots?: string[] | null
+          to_time: string
+        }
+        Update: {
+          attended?: boolean
+          camp_id?: string
+          demerit_credit?: number
+          duration_minutes?: number
+          from_time?: string
+          id?: string
+          profile_id?: string
+          response_date?: string
+          submitted_at?: string
+          time_slots?: string[] | null
+          to_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "camp_daily_responses_camp_id_fkey"
+            columns: ["camp_id"]
+            isOneToOne: false
+            referencedRelation: "camp_settings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "camp_daily_responses_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      camp_settings: {
+        Row: {
+          created_at: string
+          daily_close_time: string
+          daily_open_time: string
+          enabled: boolean
+          end_date: string
+          id: string
+          start_date: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          daily_close_time?: string
+          daily_open_time?: string
+          enabled?: boolean
+          end_date: string
+          id?: string
+          start_date: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          daily_close_time?: string
+          daily_open_time?: string
+          enabled?: boolean
+          end_date?: string
+          id?: string
+          start_date?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cohorts: {
         Row: {
           created_at: string
@@ -131,6 +267,183 @@ export type Database = {
           start_date?: string | null
         }
         Relationships: []
+      }
+      email_automation_rules: {
+        Row: {
+          audience: string
+          body_template: string
+          created_at: string
+          enabled: boolean
+          id: string
+          name: string
+          offset_minutes: number
+          require_networking: boolean
+          sort_order: number
+          subject_template: string
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          audience?: string
+          body_template: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          name: string
+          offset_minutes?: number
+          require_networking?: boolean
+          sort_order?: number
+          subject_template: string
+          trigger_type: string
+          updated_at?: string
+        }
+        Update: {
+          audience?: string
+          body_template?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          name?: string
+          offset_minutes?: number
+          require_networking?: boolean
+          sort_order?: number
+          subject_template?: string
+          trigger_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      email_automation_runs: {
+        Row: {
+          checked_at: string
+          closed: number
+          error_message: string | null
+          failed: number
+          id: string
+          opened: number
+          raw_response: Json | null
+          rules_checked: number
+          sent: number
+          skipped: number
+          trigger_source: string
+        }
+        Insert: {
+          checked_at?: string
+          closed?: number
+          error_message?: string | null
+          failed?: number
+          id?: string
+          opened?: number
+          raw_response?: Json | null
+          rules_checked?: number
+          sent?: number
+          skipped?: number
+          trigger_source?: string
+        }
+        Update: {
+          checked_at?: string
+          closed?: number
+          error_message?: string | null
+          failed?: number
+          id?: string
+          opened?: number
+          raw_response?: Json | null
+          rules_checked?: number
+          sent?: number
+          skipped?: number
+          trigger_source?: string
+        }
+        Relationships: []
+      }
+      email_send_logs: {
+        Row: {
+          dedupe_key: string
+          email: string
+          error_message: string | null
+          id: string
+          message_id: string | null
+          profile_id: string | null
+          rule_id: string | null
+          sent_at: string
+          session_id: string | null
+          status: string
+          subject: string
+        }
+        Insert: {
+          dedupe_key: string
+          email: string
+          error_message?: string | null
+          id?: string
+          message_id?: string | null
+          profile_id?: string | null
+          rule_id?: string | null
+          sent_at?: string
+          session_id?: string | null
+          status: string
+          subject: string
+        }
+        Update: {
+          dedupe_key?: string
+          email?: string
+          error_message?: string | null
+          id?: string
+          message_id?: string | null
+          profile_id?: string | null
+          rule_id?: string | null
+          sent_at?: string
+          session_id?: string | null
+          status?: string
+          subject?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_send_logs_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_send_logs_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "email_automation_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_send_logs_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_portal_tokens: {
+        Row: {
+          created_at: string
+          profile_id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          profile_id: string
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          profile_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_portal_tokens_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -195,8 +508,8 @@ export type Database = {
           updated_at: string
           venue_lat: number | null
           venue_lng: number | null
-          venue_name: string | null
           venue_map_url: string | null
+          venue_name: string | null
         }
         Insert: {
           attendance_code?: string | null
@@ -221,8 +534,8 @@ export type Database = {
           updated_at?: string
           venue_lat?: number | null
           venue_lng?: number | null
-          venue_name?: string | null
           venue_map_url?: string | null
+          venue_name?: string | null
         }
         Update: {
           attendance_code?: string | null
@@ -247,8 +560,8 @@ export type Database = {
           updated_at?: string
           venue_lat?: number | null
           venue_lng?: number | null
-          venue_name?: string | null
           venue_map_url?: string | null
+          venue_name?: string | null
         }
         Relationships: [
           {
@@ -265,7 +578,85 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_active_camp_settings: {
+        Args: never
+        Returns: {
+          created_at: string
+          daily_close_time: string
+          daily_open_time: string
+          enabled: boolean
+          end_date: string
+          id: string
+          start_date: string
+          title: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "camp_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      get_camp_survey_context: { Args: { p_profile_id: string }; Returns: Json }
+      get_member_camp_responses: {
+        Args: { p_profile_id: string }
+        Returns: {
+          attended: boolean
+          demerit_credit: number
+          duration_minutes: number
+          from_time: string
+          id: string
+          response_date: string
+          time_slots: string[]
+          to_time: string
+        }[]
+      }
+      get_or_create_member_portal_token: {
+        Args: { p_profile_id: string }
+        Returns: string
+      }
+      hyspark_camp_demerit_credit: {
+        Args: { p_duration_minutes: number }
+        Returns: number
+      }
+      hyspark_camp_response_json: {
+        Args: {
+          p_resp: Database["public"]["Tables"]["camp_daily_responses"]["Row"]
+        }
+        Returns: Json
+      }
+      hyspark_demerit_points: { Args: { p_status: string }; Returns: number }
+      hyspark_kst_date: { Args: { p_ts?: string }; Returns: string }
+      invoke_auto_open_sessions_edge: { Args: never; Returns: undefined }
+      invoke_camp_survey_reminder_edge: { Args: never; Returns: undefined }
+      maybe_open_due_sessions: { Args: never; Returns: number }
+      member_check_in: {
+        Args: { p_code: string; p_member_id: string; p_session_id: string }
+        Returns: Json
+      }
+      member_submit_absence: {
+        Args: {
+          p_category?: string
+          p_member_id: string
+          p_note?: string
+          p_session_id: string
+          p_status: string
+        }
+        Returns: Json
+      }
+      resolve_member_portal_token: { Args: { p_token: string }; Returns: Json }
+      submit_camp_daily_response: {
+        Args: {
+          p_attended?: boolean
+          p_from_time: string
+          p_profile_id: string
+          p_response_date?: string
+          p_time_slots?: string[]
+          p_to_time: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
@@ -394,6 +785,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

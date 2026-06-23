@@ -52,7 +52,7 @@ export default function CampSurveyCard({ memberId, focusOnMount = false, onSaved
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
   const [justSubmitted, setJustSubmitted] = useState<{ title: string; description: string } | null>(null);
 
-  const campDays = context?.days ?? [];
+  const campDays = useMemo(() => context?.days ?? [], [context?.days]);
   const todayKst = context?.today_kst ?? '';
   const selectedDay = useMemo(
     () => campDays.find(day => day.date === selectedDate),
@@ -74,7 +74,7 @@ export default function CampSurveyCard({ memberId, focusOnMount = false, onSaved
       return;
     }
 
-    const ctx = data as CampSurveyContext;
+    const ctx = data as unknown as CampSurveyContext;
     setContext(ctx);
 
     if (ctx.active && ctx.camp && ctx.days?.length) {

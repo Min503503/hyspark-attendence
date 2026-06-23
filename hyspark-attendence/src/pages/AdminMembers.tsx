@@ -106,7 +106,7 @@ export default function AdminMembers() {
     }
 
     setSendingMail(true);
-    const { data, error } = await invokeWithAdminToken('send-member-email', {
+    const { data, error } = await invokeWithAdminToken<{ sent?: number; error?: string }>('send-member-email', {
       body: {
         recipientIds: mailRecipients.map(member => member.id),
         subject: mailSubject.trim(),

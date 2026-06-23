@@ -6,6 +6,10 @@ import {
   describeAutomationSendForSession,
   formatAutomationSendTime,
 } from '@/lib/emailSchedule';
+import {
+  EMAIL_KIND_LABELS,
+  SESSION_EMAIL_TEMPLATE_KINDS,
+} from '@/lib/emailHtmlTemplates';
 
 describe('emailSchedule', () => {
   it('5일 전 리마인드: 세션 5일 전 주 월요일 10:00 KST', () => {
@@ -43,5 +47,16 @@ describe('emailSchedule', () => {
   it('exposes human-readable schedule policies', () => {
     expect(AUTOMATION_SCHEDULE_POLICY.session_reminder_5d).toContain('월요일');
     expect(AUTOMATION_SCHEDULE_POLICY.session_reminder_1d).toContain('24시간');
+  });
+
+  it('keeps camp survey mail separate from the four session automations', () => {
+    expect(SESSION_EMAIL_TEMPLATE_KINDS).toEqual([
+      'session_reminder_5d',
+      'session_reminder_1d',
+      'session_open',
+      'checkin_complete',
+    ]);
+    expect(SESSION_EMAIL_TEMPLATE_KINDS).not.toContain('camp_daily_survey_reminder');
+    expect(EMAIL_KIND_LABELS.camp_daily_survey_reminder).toBe('캠프 일일 설문');
   });
 });

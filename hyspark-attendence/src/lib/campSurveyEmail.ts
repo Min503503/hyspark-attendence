@@ -78,7 +78,7 @@ export async function sendCampSurveyTestEmails(params: {
     };
   }));
 
-  const { data, error } = await invokeWithAdminToken('send-member-email', {
+  const { data, error } = await invokeWithAdminToken<{ sent?: number; error?: string }>('send-member-email', {
     body: {
       messages,
       manual: true,

@@ -1,4 +1,4 @@
-import type { EmailTemplateKind } from '@/lib/emailHtmlTemplates';
+import type { SessionEmailTemplateKind } from '@/lib/emailHtmlTemplates';
 
 export type EmailTriggerType = 'session_before' | 'session_open' | 'checkin_complete';
 export type EmailAudience = 'all_members' | 'staff';
@@ -48,7 +48,7 @@ export interface EmailAutomationRun {
 
 export const FIXED_AUTOMATIONS: Array<{
   trigger: EmailTriggerType;
-  kind: EmailTemplateKind;
+  kind: SessionEmailTemplateKind;
   name: string;
   description: string;
   offsetMinutes?: number;
@@ -81,14 +81,14 @@ export const FIXED_AUTOMATIONS: Array<{
   },
 ];
 
-export const AUTOMATION_TIMING: Record<EmailTemplateKind, string> = {
+export const AUTOMATION_TIMING: Record<SessionEmailTemplateKind, string> = {
   session_reminder_5d: '세션 5일 전 주 월요일 오전 10:00에 활성 학회원 전원에게 자동 발송',
   session_reminder_1d: '세션 시작 24시간 전에 활성 학회원 전원에게 자동 발송',
   session_open: '출석 코드가 활성화되는 순간 활성 학회원 전원에게 자동 발송',
   checkin_complete: '멤버가 체크인을 완료한 직후 해당 멤버에게 자동 발송',
 };
 
-export function findRuleForKind(rules: EmailAutomationRule[], kind: EmailTemplateKind) {
+export function findRuleForKind(rules: EmailAutomationRule[], kind: SessionEmailTemplateKind) {
   const fixed = FIXED_AUTOMATIONS.find(item => item.kind === kind);
   if (!fixed) return undefined;
   return rules.find(rule =>
