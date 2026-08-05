@@ -34,11 +34,18 @@ firebase-debug.log
 
 # Gmail OAuth (scripts/gmail)
 scripts/gmail/credentials.json
+scripts/gmail/credentials.json.bak*
 scripts/gmail/token.json
+scripts/gmail/token.json.bak*
 scripts/gmail/supabase-secrets.local.sh
 scripts/gmail/supabase-secrets.env
 scripts/.migration-export
 scripts/.migration-import-batches.json
 scripts/.migration-import-sql
 scripts/gmail/.venv
+scripts/gmail/__pycache__/
+*.pyc
 src/assets/*.bak
+
+# Supabase local CLI state
+supabase/.temp/

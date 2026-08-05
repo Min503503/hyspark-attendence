@@ -20,6 +20,7 @@ export function buildCampSurveyPreviewHtml(params: {
   campDateRange: string;
   todayLabel?: string;
   campSurveyLink?: string;
+  unsubscribeUrl?: string;
 }) {
   return buildCampSurveyReminderEmail({
     memberName: params.memberName,
@@ -27,6 +28,7 @@ export function buildCampSurveyPreviewHtml(params: {
     campDateRange: params.campDateRange,
     todayLabel: params.todayLabel || formatCampTodayLabel(),
     campSurveyLink: params.campSurveyLink,
+    unsubscribeUrl: params.unsubscribeUrl ?? '#unsubscribe-preview',
   }).html;
 }
 
@@ -57,7 +59,7 @@ export async function sendCampSurveyTestEmails(params: {
   );
 
   if (recipients.length === 0) {
-    return { error: new Error('테스트 발송은 cmins1@naver.com 등록 멤버만 가능합니다.'), sent: 0 };
+    return { error: new Error('수신자를 선택해주세요.'), sent: 0 };
   }
 
   const todayLabel = formatCampTodayLabel();

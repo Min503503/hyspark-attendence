@@ -34,6 +34,10 @@ function mapProfile(row: ProfileRow): Profile {
     member_code: row.member_code || undefined,
     cohort_label: row.cohort_label || undefined,
     status: row.status as 'active' | 'inactive',
+    mail_delivery_status: (row.mail_delivery_status as Profile['mail_delivery_status']) ?? 'active',
+    bounce_count: row.bounce_count ?? 0,
+    last_bounce_at: row.last_bounce_at || undefined,
+    last_bounce_reason: row.last_bounce_reason || undefined,
   };
 }
 

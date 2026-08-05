@@ -1,0 +1,19 @@
+---
+description: HySpark 배포 전 브라우저·API 보안 점검 (전역 규칙 보조)
+alwaysApply: true
+---
+
+# HySpark — 브라우저 보안 점검
+
+**전역 10항목:** `~/.cursor/rules/browser-security-review.mdc` (모든 프로젝트 공통)
+
+## HySpark 배포 전 추가
+
+- **무인증 API:** `npm run smoke` (`scripts/smoke-security.sh` — anon INSERT·Edge 무토큰·admin-auth)
+- **듀얼 포털:** admin·member **각각** 빌드 산출물(`dist-admin` / `dist-member`)에서 env·JS grep
+- **공개 키 vs secret:** `VITE_SUPABASE_PUBLISHABLE_KEY`는 공개 OK. Gmail OAuth·service role·admin password는 **Edge secrets만**
+- **확인 URL:** Admin `https://hysparkpre-admin.web.app` · Member `https://hysparkpre-member.web.app`
+
+## 완료 보고
+
+전역 규칙과 동일 — smoke 결과·grep 증거·미검증 항목 분리.

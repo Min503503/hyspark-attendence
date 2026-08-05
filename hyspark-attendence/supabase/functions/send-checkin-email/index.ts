@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
     const [{ data: profile, error: profileError }, { data: session, error: sessionError }] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, full_name, email, role, status")
+        .select("id, full_name, email, role, status, mail_delivery_status")
         .eq("id", payload.memberId)
         .maybeSingle(),
       supabase
@@ -68,6 +68,10 @@ Deno.serve(async (req) => {
     }
     if (!profile?.email || profile.status !== "active" || profile.role !== "member") {
       return jsonResponse({ skipped: true, reason: "no eligible email" });
+    }
+    // checkin_complete is essential — only skip permanently bounced accounts
+    if (profile.mail_delivery_status === "bounced") {
+      return jsonResponse({ skipped: true, reason: "bounced" });
     }
     if (!session) {
       return jsonResponse({ error: "session not found" }, 404);
@@ -110,6 +114,7 @@ Deno.serve(async (req) => {
         attendanceStatus: payload.status,
         checkInLink: memberPortalUrl("checkin", { token: portalToken }),
         absenceLink: memberPortalUrl("absence", { token: portalToken }),
+        // No unsubscribeUrl: checkin_complete is an essential transactional mail
       },
     );
 

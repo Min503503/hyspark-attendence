@@ -44,6 +44,7 @@ export interface EmailTemplateData {
   checkInOpenMinutes?: number;
   checkedInAt?: string;
   attendanceStatus?: AttendanceStatusLabel;
+  unsubscribeUrl?: string;
 }
 
 export const EMAIL_KIND_LABELS: Record<EmailTemplateKind, string> = {
@@ -285,9 +286,13 @@ function emailShell(params: {
   salutation: string;
   body: string;
   logoUrl?: string;
+  unsubscribeUrl?: string;
 }) {
   const logoUrl = params.logoUrl || emailLogoUrl();
   const subtitle = params.subtitle || `${params.salutation}님께 드리는 안내`;
+  const unsubscribeLine = params.unsubscribeUrl
+    ? `<br /><a href="${escapeHtml(params.unsubscribeUrl)}" style="color:${C.caption};text-decoration:underline;font-size:11px;">메일 수신 거부</a>`
+    : "";
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -320,9 +325,8 @@ function emailShell(params: {
           </tr>
           <tr>
             <td style="padding:20px 40px 24px;background:${C.footerBg};font-family:${FONT_STACK};font-size:12px;line-height:1.65;color:${C.caption};text-align:center;letter-spacing:-0.01em;">
-              본 메일은 발신 전용입니다.<br />
-              하이스파크 학회 출결 시스템<br />
-              © ${new Date().getFullYear()} 하이스파크 학회
+              본 메일은 하이스파크 학회 출결 시스템에서 자동 발송됩니다.<br />
+              © ${new Date().getFullYear()} 하이스파크 학회${unsubscribeLine}
             </td>
           </tr>
         </table>
@@ -345,6 +349,7 @@ function buildSessionReminderHtml(data: EmailTemplateData, daysBefore: 5 | 1) {
     headline,
     subtitle,
     salutation: data.memberName,
+    unsubscribeUrl: data.unsubscribeUrl,
     body: [
       infoTable([
         { label: '세션', value: data.sessionTitle },
@@ -391,6 +396,7 @@ export function buildEmailHtml(kind: EmailTemplateKind, data: EmailTemplateData)
         headline: '지금 출석할 수 있어요',
         subtitle: `${data.memberName}님의 출석 안내`,
         salutation: data.memberName,
+        unsubscribeUrl: data.unsubscribeUrl,
         body: [
           infoTable([
             { label: '세션', value: data.sessionTitle },
@@ -410,6 +416,7 @@ export function buildEmailHtml(kind: EmailTemplateKind, data: EmailTemplateData)
         headline: '출석이 완료됐어요',
         subtitle: `${data.memberName}님의 출석 결과`,
         salutation: data.memberName,
+        // checkin_complete is essential — no unsubscribe link
         body: [
           infoTable([
             { label: '세션', value: data.sessionTitle },
@@ -427,6 +434,7 @@ export function buildEmailHtml(kind: EmailTemplateKind, data: EmailTemplateData)
         headline: '오늘 캠프 참여 시간을 입력해 주세요',
         subtitle: `${data.memberName}님의 캠프 설문`,
         salutation: data.memberName,
+        unsubscribeUrl: data.unsubscribeUrl,
         body: [
           infoTable([
             { label: '캠프', value: data.campTitle || data.sessionTitle },
@@ -452,6 +460,7 @@ export function buildCampSurveyReminderEmail(params: {
   campDateRange: string;
   todayLabel: string;
   campSurveyLink?: string;
+  unsubscribeUrl?: string;
 }) {
   const data: EmailTemplateData = {
     memberName: params.memberName,
@@ -461,6 +470,7 @@ export function buildCampSurveyReminderEmail(params: {
     campSurveyLink: params.campSurveyLink || memberPortalUrl("camp-survey"),
     campTitle: params.campTitle,
     campDateRange: params.campDateRange,
+    unsubscribeUrl: params.unsubscribeUrl,
   };
   return {
     subject: buildEmailSubject('camp_daily_survey_reminder', data),
@@ -510,6 +520,7 @@ export function buildEmailFromSession(
     attendanceStatus?: AttendanceStatusLabel;
     absenceLink?: string;
     checkInLink?: string;
+    unsubscribeUrl?: string;
   },
 ) {
   const memberBase = memberSiteUrl();
@@ -527,6 +538,7 @@ export function buildEmailFromSession(
     checkInOpenMinutes: session.check_in_open_minutes,
     checkedInAt: extra?.checkedInAt ? formatCheckInDateTime(extra.checkedInAt) : undefined,
     attendanceStatus: extra?.attendanceStatus,
+    unsubscribeUrl: extra?.unsubscribeUrl,
   };
 
   return {
@@ -555,11 +567,13 @@ export function buildManualEmailHtml(params: {
   memberName: string;
   headline: string;
   bodyText: string;
+  unsubscribeUrl?: string;
 }) {
   return emailShell({
     headline: params.headline,
     subtitle: `${params.memberName}님께 드리는 안내`,
     salutation: params.memberName,
+    unsubscribeUrl: params.unsubscribeUrl,
     body: [
       bodyText(`안녕하세요 ${escapeHtml(params.memberName)}님,`),
       plainTextToBodyHtml(params.bodyText),

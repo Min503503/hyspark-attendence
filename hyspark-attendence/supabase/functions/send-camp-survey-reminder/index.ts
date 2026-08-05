@@ -5,7 +5,9 @@ import {
 import { buildCampSurveyReminderEmail } from "../_shared/email-html-templates.ts";
 import { getMemberPortalToken, memberPortalUrl } from "../_shared/member-portal-link.ts";
 import {
+  RateLimitError,
   corsHeaders,
+  generateUnsubscribeToken,
   getGmailAccessToken,
   jsonResponse,
   requireEnv,
@@ -20,7 +22,12 @@ type CampSettings = {
   enabled: boolean;
 };
 
-type Profile = { id: string; full_name: string; email: string | null };
+type Profile = {
+  id: string;
+  full_name: string;
+  email: string | null;
+  mail_delivery_status: string;
+};
 
 function kstDateString(date = new Date()): string {
   return date.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
@@ -34,6 +41,14 @@ function formatTodayLabel(date = new Date()): string {
     day: "numeric",
     weekday: "short",
   });
+}
+
+async function buildUnsubscribeUrl(profileId: string, email: string): Promise<string | undefined> {
+  const secret = Deno.env.get("UNSUBSCRIBE_SECRET");
+  if (!secret) return undefined;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+  const token = await generateUnsubscribeToken(profileId, email, secret);
+  return `${supabaseUrl}/functions/v1/email-unsubscribe?token=${encodeURIComponent(token)}`;
 }
 
 Deno.serve(async (req) => {
@@ -63,7 +78,7 @@ Deno.serve(async (req) => {
 
     const { data: profiles, error: profilesError } = await supabase
       .from("profiles")
-      .select("id, full_name, email")
+      .select("id, full_name, email, mail_delivery_status")
       .eq("role", "member")
       .eq("status", "active")
       .not("email", "is", null);
@@ -78,9 +93,17 @@ Deno.serve(async (req) => {
     let sent = 0;
     let skipped = 0;
     let failed = 0;
+    let rateLimited = false;
+    let retryAt: string | undefined;
 
     for (const profile of (profiles || []) as Profile[]) {
       if (!profile.email) continue;
+
+      // Block bounced and unsubscribed — this is a general (non-essential) mail
+      if (profile.mail_delivery_status === "bounced" || profile.mail_delivery_status === "unsubscribed") {
+        skipped += 1;
+        continue;
+      }
 
       const dedupeKey = `camp-survey-${camp.id}-${today}-${profile.id}`;
       const { data: existing } = await supabase
@@ -95,16 +118,18 @@ Deno.serve(async (req) => {
       }
 
       const portalToken = await getMemberPortalToken(supabase, profile.id);
+      const unsubscribeUrl = await buildUnsubscribeUrl(profile.id, profile.email);
       const { subject, html } = buildCampSurveyReminderEmail({
         memberName: profile.full_name,
         campTitle: camp.title,
         campDateRange,
         todayLabel,
         campSurveyLink: memberPortalUrl("camp-survey", { token: portalToken }),
+        unsubscribeUrl,
       });
 
       try {
-        const result = await sendGmail(accessToken, from, profile.email, subject, html, { html: true });
+        const result = await sendGmail(accessToken, from, profile.email, subject, html, { html: true, unsubscribeUrl });
         await supabase.from("email_send_logs").insert({
           profile_id: profile.id,
           email: profile.email,
@@ -125,6 +150,16 @@ Deno.serve(async (req) => {
           dedupe_key: dedupeKey,
         });
         failed += 1;
+
+        if (err instanceof RateLimitError) {
+          retryAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+          await supabase.from("email_send_state").upsert(
+            { key: "send_cooldown", value: { retryAt }, updated_at: new Date().toISOString() },
+            { onConflict: "key" },
+          );
+          rateLimited = true;
+          break;
+        }
       }
     }
 
@@ -135,6 +170,8 @@ Deno.serve(async (req) => {
       sent,
       skipped,
       failed,
+      rateLimited,
+      retryAt,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "camp survey reminder failed";

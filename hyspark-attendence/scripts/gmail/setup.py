@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import json
+import re
+import secrets
 import sys
 from pathlib import Path
 
@@ -52,16 +54,55 @@ def authorize(scopes: list[str], fresh: bool) -> Credentials:
     return creds
 
 
-def write_supabase_secrets(client_id: str, client_secret: str, refresh_token: str, sender: str) -> None:
-    content = f"""#!/bin/bash
+def _read_existing_secret(key: str) -> str | None:
+    """Return the value of key from the existing secrets .env file, if present."""
+    if not SECRETS_FILE.exists():
+        return None
+    for line in SECRETS_FILE.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line.startswith(f"{key}="):
+            return line[len(key) + 1:].strip().strip('"')
+    return None
+
+
+def write_supabase_secrets(
+    client_id: str,
+    client_secret: str,
+    refresh_token: str,
+    sender: str,
+    unsubscribe_secret: str,
+) -> None:
+    # Preserve EMAIL_LOGO_URL and MEMBER_SITE_URL from existing file if present
+    logo_url = _read_existing_secret("EMAIL_LOGO_URL") or ""
+    member_site_url = _read_existing_secret("MEMBER_SITE_URL") or ""
+
+    content = f"""# 자동 생성 — git에 올리지 마세요.
+EMAIL_LOGO_URL={logo_url}
+MEMBER_SITE_URL={member_site_url}
+GMAIL_FROM={sender}
+GMAIL_SENDER_NAME=HySpark
+GMAIL_CLIENT_ID={client_id}
+GMAIL_CLIENT_SECRET={client_secret}
+GMAIL_REFRESH_TOKEN={refresh_token}
+GMAIL_READONLY_REFRESH_TOKEN={refresh_token}
+UNSUBSCRIBE_SECRET={unsubscribe_secret}
+"""
+    SECRETS_FILE.write_text(content, encoding="utf-8")
+    SECRETS_FILE.chmod(0o600)
+
+    # Also update the .sh version for local sourcing
+    sh_file = DIR / "supabase-secrets.local.sh"
+    sh_content = f"""#!/bin/bash
 # 자동 생성 — git에 올리지 마세요. 실행: source scripts/gmail/supabase-secrets.local.sh
 export GMAIL_FROM="{sender}"
 export GMAIL_CLIENT_ID="{client_id}"
 export GMAIL_CLIENT_SECRET="{client_secret}"
 export GMAIL_REFRESH_TOKEN="{refresh_token}"
+export GMAIL_READONLY_REFRESH_TOKEN="{refresh_token}"
+export UNSUBSCRIBE_SECRET="{unsubscribe_secret}"
 """
-    SECRETS_FILE.write_text(content, encoding="utf-8")
-    SECRETS_FILE.chmod(0o600)
+    sh_file.write_text(sh_content, encoding="utf-8")
+    sh_file.chmod(0o600)
 
 
 def main() -> None:
@@ -76,6 +117,7 @@ def main() -> None:
     print(f"발송 계정: {sender}", flush=True)
     print(f"Google Cloud: {cfg['googleCloudProject']}", flush=True)
     print(f"Supabase: {supabase_ref}", flush=True)
+    print(f"OAuth 스코프: {', '.join(scopes)}", flush=True)
     consent = cfg.get("oauthConsent") or {}
     if consent:
         print("\nOAuth 동의 화면 (테스트 모드):", flush=True)
@@ -99,21 +141,18 @@ def main() -> None:
     client_id = data.get("client_id") or installed.get("client_id", "")
     client_secret = data.get("client_secret") or installed.get("client_secret", "")
 
-    write_supabase_secrets(client_id, client_secret, refresh, sender)
+    # Reuse existing UNSUBSCRIBE_SECRET so tokens issued before don't break
+    unsubscribe_secret = _read_existing_secret("UNSUBSCRIBE_SECRET") or secrets.token_hex(32)
+    if not _read_existing_secret("UNSUBSCRIBE_SECRET"):
+        print(f"UNSUBSCRIBE_SECRET 신규 생성")
+
+    write_supabase_secrets(client_id, client_secret, refresh, sender, unsubscribe_secret)
 
     print("\n=== OAuth 완료 ===\n")
     print(f"secrets 파일: {SECRETS_FILE.relative_to(DIR.parent.parent)}")
     print("\n다음 명령으로 Supabase에 반영:\n")
-    print(f"  cd {DIR.parent.parent.name}")
-    print(f"  supabase link --project-ref {supabase_ref}")
-    print("  source scripts/gmail/supabase-secrets.local.sh")
-    print(
-        '  supabase secrets set '
-        f'GMAIL_FROM="$GMAIL_FROM" GMAIL_CLIENT_ID="$GMAIL_CLIENT_ID" '
-        f'GMAIL_CLIENT_SECRET="$GMAIL_CLIENT_SECRET" GMAIL_REFRESH_TOKEN="$GMAIL_REFRESH_TOKEN"'
-    )
-    print(f"  supabase functions deploy {fn}\n")
-    print("관리자 페이지: 멤버 관리 → 메일 발송")
+    print("  npm run gmail:deploy")
+    print("")
 
 
 if __name__ == "__main__":

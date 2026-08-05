@@ -13,6 +13,7 @@ async function buildPersonalizedEmail(
   member: MemberWithSummary,
   session: Session,
   checkInExtra?: { checkedInAt: string; attendanceStatus: 'present' | 'late' | 'unexcused_absent' },
+  { previewUnsubscribe = false } = {},
 ) {
   const [absenceLink, checkInLink] = await Promise.all([
     memberPortalUrlForProfile('absence', member.id),
@@ -35,6 +36,7 @@ async function buildPersonalizedEmail(
       ...checkInExtra,
       absenceLink,
       checkInLink,
+      unsubscribeUrl: previewUnsubscribe && kind !== 'checkin_complete' ? '#unsubscribe-preview' : undefined,
     },
   );
 }
@@ -52,7 +54,7 @@ export async function sendTemplateEmails(params: {
   );
 
   if (recipients.length === 0) {
-    return { error: new Error('테스트 발송은 cmins1@naver.com 등록 멤버만 가능합니다.'), sent: 0 };
+    return { error: new Error('수신자를 선택해주세요.'), sent: 0 };
   }
 
   if (kind === 'checkin_complete') {
@@ -134,13 +136,13 @@ export function buildPreviewHtml(
   ).html;
 }
 
-/** Admin 미리보기·테스트 발송용 — 수신 멤버별 m= 토큰 링크 포함 */
+/** Admin 미리보기·테스트 발송용 — 수신 멤버별 m= 토큰 링크 포함 + 수신거부 링크 placeholder */
 export async function buildPreviewHtmlAsync(
   kind: SessionEmailTemplateKind,
   session: Session,
   member: MemberWithSummary,
   checkInExtra?: { checkedInAt: string; attendanceStatus: 'present' | 'late' | 'unexcused_absent' },
 ) {
-  const built = await buildPersonalizedEmail(kind, member, session, checkInExtra);
+  const built = await buildPersonalizedEmail(kind, member, session, checkInExtra, { previewUnsubscribe: true });
   return built.html;
 }

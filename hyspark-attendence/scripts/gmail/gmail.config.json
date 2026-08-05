@@ -5,7 +5,10 @@
   "googleCloudProject": "hyspark",
   "supabaseProjectRef": "lwbjprzrnmlnmzlxiwrv",
   "edgeFunction": "send-member-email",
-  "oauthScopes": ["https://www.googleapis.com/auth/gmail.send"],
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.readonly"
+  ],
   "oauthConsent": {
     "homepageUrl": "https://hysparkpre-member.web.app/about.html",
     "privacyPolicyUrl": "https://hysparkpre-member.web.app/privacy.html",

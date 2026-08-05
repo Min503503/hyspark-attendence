@@ -1,6 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
+  RateLimitError,
   corsHeaders,
+  generateUnsubscribeToken,
   getGmailAccessToken,
   jsonResponse,
   requireEnv,
@@ -14,6 +16,8 @@ import { computeAutomationSendAtFromRule } from "../_shared/email-schedule.ts";
 import { getMemberPortalToken, memberPortalUrl } from "../_shared/member-portal-link.ts";
 
 const WINDOW_MS = 20 * 60 * 1000;
+const COOLDOWN_KEY = "send_cooldown";
+const COOLDOWN_MS = 10 * 60 * 1000;
 
 type Rule = {
   id: string;
@@ -39,7 +43,14 @@ type Session = {
   attendance_code_issued_at: string | null;
 };
 
-type Profile = { id: string; full_name: string; email: string | null; role: string; status: string };
+type Profile = {
+  id: string;
+  full_name: string;
+  email: string | null;
+  role: string;
+  status: string;
+  mail_delivery_status: string;
+};
 
 function inWindow(now: Date, target: Date) {
   const diff = now.getTime() - target.getTime();
@@ -67,6 +78,14 @@ function ruleMatchesSession(rule: Rule, session: Session, now: Date) {
   return false;
 }
 
+async function buildUnsubscribeUrl(profileId: string, email: string): Promise<string | undefined> {
+  const secret = Deno.env.get("UNSUBSCRIBE_SECRET");
+  if (!secret) return undefined;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+  const token = await generateUnsubscribeToken(profileId, email, secret);
+  return `${supabaseUrl}/functions/v1/email-unsubscribe?token=${encodeURIComponent(token)}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -76,6 +95,17 @@ Deno.serve(async (req) => {
     const supabase = createClient(requireEnv("SUPABASE_URL"), requireEnv("SUPABASE_SERVICE_ROLE_KEY"));
     const from = requireEnv("GMAIL_FROM");
     const now = new Date();
+
+    // Check rate-limit cooldown
+    const { data: cooldownRow } = await supabase
+      .from("email_send_state")
+      .select("value")
+      .eq("key", COOLDOWN_KEY)
+      .maybeSingle();
+    const retryAtStored = cooldownRow?.value?.retryAt as string | undefined;
+    if (retryAtStored && new Date(retryAtStored) > now) {
+      return jsonResponse({ checked_at: now.toISOString(), sent: 0, skipped: 0, failed: 0, rateLimited: true, retryAt: retryAtStored, rules_checked: 0 });
+    }
 
     const { data: rules, error: rulesError } = await supabase
       .from("email_automation_rules")
@@ -95,7 +125,7 @@ Deno.serve(async (req) => {
 
     const { data: profiles, error: profilesError } = await supabase
       .from("profiles")
-      .select("id, full_name, email, role, status")
+      .select("id, full_name, email, role, status, mail_delivery_status")
       .eq("status", "active")
       .not("email", "is", null);
 
@@ -105,8 +135,10 @@ Deno.serve(async (req) => {
     let sent = 0;
     let skipped = 0;
     let failed = 0;
+    let rateLimited = false;
+    let retryAt: string | undefined;
 
-    for (const rule of (rules || []) as Rule[]) {
+    outer: for (const rule of (rules || []) as Rule[]) {
       const templateKind = triggerToTemplateKind(rule.trigger_type, rule.offset_minutes);
       if (!templateKind) continue;
 
@@ -120,6 +152,17 @@ Deno.serve(async (req) => {
         });
 
         for (const profile of recipients) {
+          // Bounced: block all mail
+          if (profile.mail_delivery_status === "bounced") {
+            skipped++;
+            continue;
+          }
+          // Unsubscribed: block general automation (session reminders / open)
+          if (profile.mail_delivery_status === "unsubscribed") {
+            skipped++;
+            continue;
+          }
+
           const dedupeKey = `${rule.id}:${session.id}:${profile.id}`;
           const { data: existing } = await supabase
             .from("email_send_logs")
@@ -133,12 +176,14 @@ Deno.serve(async (req) => {
           }
 
           const portalToken = await getMemberPortalToken(supabase, profile.id);
+          const unsubscribeUrl = await buildUnsubscribeUrl(profile.id, profile.email!);
           const { subject, html } = buildEmailFromSession(templateKind, profile, session, {
             absenceLink: memberPortalUrl("absence", { token: portalToken }),
             checkInLink: memberPortalUrl("checkin", { token: portalToken }),
+            unsubscribeUrl,
           });
 
-          // Pre-insert log with 'sent' status to acquire UNIQUE key lock
+          // Pre-insert log to acquire UNIQUE key lock
           const { error: lockError } = await supabase
             .from("email_send_logs")
             .insert({
@@ -152,13 +197,12 @@ Deno.serve(async (req) => {
             });
 
           if (lockError) {
-            // If another instance inserted the log concurrently, skip this send
             skipped++;
             continue;
           }
 
           try {
-            const result = await sendGmail(accessToken, from, profile.email!, subject, html, { html: true });
+            const result = await sendGmail(accessToken, from, profile.email!, subject, html, { html: true, unsubscribeUrl });
             if (result?.id) {
               await supabase
                 .from("email_send_logs")
@@ -170,12 +214,19 @@ Deno.serve(async (req) => {
             const message = err instanceof Error ? err.message : "send failed";
             await supabase
               .from("email_send_logs")
-              .update({
-                status: "failed",
-                error_message: message,
-              })
+              .update({ status: "failed", error_message: message })
               .eq("dedupe_key", dedupeKey);
             failed++;
+
+            if (err instanceof RateLimitError) {
+              retryAt = new Date(Date.now() + COOLDOWN_MS).toISOString();
+              await supabase.from("email_send_state").upsert(
+                { key: COOLDOWN_KEY, value: { retryAt }, updated_at: new Date().toISOString() },
+                { onConflict: "key" },
+              );
+              rateLimited = true;
+              break outer;
+            }
           }
         }
       }
@@ -186,6 +237,8 @@ Deno.serve(async (req) => {
       sent,
       skipped,
       failed,
+      rateLimited,
+      retryAt,
       rules_checked: (rules || []).length,
     });
   } catch (error) {

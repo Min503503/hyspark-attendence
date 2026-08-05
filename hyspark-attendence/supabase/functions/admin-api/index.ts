@@ -234,14 +234,26 @@ Deno.serve(async (req) => {
       }
 
       case "update_member": {
+        // If email is changing, reset bounce block so the new address gets a fresh start
+        const { data: existingProfile } = await supabase
+          .from("profiles")
+          .select("email, mail_delivery_status")
+          .eq("id", p.id)
+          .maybeSingle();
+
+        const newEmail = p.email || null;
+        const emailChanged = existingProfile && existingProfile.email !== newEmail;
+        const resetDelivery = emailChanged && existingProfile?.mail_delivery_status === "bounced";
+
         const { error } = await supabase.from("profiles").update({
           full_name: p.full_name,
           cohort_label: p.cohort_label,
           status: p.status,
-          email: p.email || null,
+          email: newEmail,
+          ...(resetDelivery ? { mail_delivery_status: "active", bounce_count: 0, last_bounce_at: null, last_bounce_reason: null } : {}),
         }).eq("id", p.id).eq("role", "member");
         if (error) throw new Error(error.message);
-        return jsonResponse({ ok: true });
+        return jsonResponse({ ok: true, bounceReset: resetDelivery ?? false });
       }
 
       case "delete_member": {

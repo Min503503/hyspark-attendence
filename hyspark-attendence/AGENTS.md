@@ -5,7 +5,7 @@
 | 범위 | 위치 |
 |------|------|
 | **모든 프로젝트** | `~/.cursor/rules/` (4개 alwaysApply) · `/Users/choiminsoo/Documents/docs/AGENT_RETROSPECTIVE_GLOBAL.md` · `Documents/AGENTS.md` |
-| **HySpark 전용** | `.cursor/rules/agent-retrospective.mdc`, `hyspark-session-retrospective.mdc`, `cross-tool-git.mdc`, `docs/AGENT_RETROSPECTIVE.md` |
+| **HySpark 전용** | `.cursor/rules/agent-retrospective.mdc`, `hyspark-session-retrospective.mdc`, `browser-security-review.mdc`, `cross-tool-git.mdc`, `docs/AGENT_RETROSPECTIVE.md` |
 
 **HySpark 핵심:** 4종 자동화 · 장소 카드 · 프론트↔엣지 메일 동기화 · `intent=absence|checkin` · 배포 명시 요청 후
 

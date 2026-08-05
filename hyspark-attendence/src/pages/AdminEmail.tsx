@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, Loader2, Mail, Send, Settings2, Sparkles } from 'lucide-react';
+import { Activity, AlertTriangle, Loader2, Mail, Send, Settings2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,7 +35,6 @@ import {
   upcomingAutomationSessions,
 } from '@/lib/emailSchedule';
 import { buildPreviewHtmlAsync, sendTemplateEmails } from '@/lib/emailTestSend';
-import { TEST_EMAIL_RECIPIENT } from '@/lib/emailTestPolicy';
 import {
   buildCampSurveyPreviewHtml,
   buildCampSurveyPreviewHtmlAsync,
@@ -105,6 +104,7 @@ export default function AdminEmail() {
   const [manualBody, setManualBody] = useState('');
   const [manualRecipientIds, setManualRecipientIds] = useState<string[]>([]);
   const [sendingManual, setSendingManual] = useState(false);
+  const [rateLimitRetryAt, setRateLimitRetryAt] = useState<string | null>(null);
   const [campSettings, setCampSettings] = useState<{
     title: string;
     start_date: string;
@@ -114,6 +114,7 @@ export default function AdminEmail() {
     enabled: boolean;
   } | null>(null);
   const [sendingCampTest, setSendingCampTest] = useState(false);
+  const [campRecipientIds, setCampRecipientIds] = useState<string[]>([]);
   const [automationPreviewHtml, setAutomationPreviewHtml] = useState('');
   const [testPreviewHtml, setTestPreviewHtml] = useState('');
   const [campPreviewHtml, setCampPreviewHtml] = useState('');
@@ -122,6 +123,25 @@ export default function AdminEmail() {
   const membersWithEmail = useMemo(
     () => members.filter(m => m.status === 'active' && m.email),
     [members],
+  );
+
+  const deliveryStats = useMemo(() => ({
+    bounced: members.filter(m => m.mail_delivery_status === 'bounced').length,
+    unsubscribed: members.filter(m => m.mail_delivery_status === 'unsubscribed').length,
+  }), [members]);
+
+  const metrics24h = useMemo(() => {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const recent = logs.filter(l => l.sent_at >= cutoff);
+    return {
+      sent: recent.filter(l => l.status === 'sent').length,
+      failed: recent.filter(l => l.status === 'failed').length,
+    };
+  }, [logs]);
+
+  const rateLimitCooldownActive = useMemo(
+    () => !!rateLimitRetryAt && new Date(rateLimitRetryAt) > new Date(),
+    [rateLimitRetryAt],
   );
 
   const standardRules = useMemo(() => orderedStandardRules(rules), [rules]);
@@ -257,12 +277,15 @@ export default function AdminEmail() {
     return picked || membersWithEmail[0];
   }, [membersWithEmail, manualRecipientIds]);
 
-  const campTestMember = useMemo(
-    () => membersWithEmail.find(
-      member => member.email?.trim().toLowerCase() === TEST_EMAIL_RECIPIENT.toLowerCase(),
-    ),
+  const campRecipients = useMemo(
+    () => membersWithEmail.filter(member => member.mail_delivery_status === 'active'),
     [membersWithEmail],
   );
+
+  const campPreviewMember = useMemo(() => {
+    const picked = campRecipients.find(member => campRecipientIds.includes(member.id));
+    return picked || campRecipients[0];
+  }, [campRecipients, campRecipientIds]);
 
   const campDateRange = campSettings
     ? `${campSettings.start_date} ~ ${campSettings.end_date}`
@@ -273,7 +296,7 @@ export default function AdminEmail() {
       setCampPreviewHtml('');
       return;
     }
-    const member = campTestMember;
+    const member = campPreviewMember;
     if (!member) {
       setCampPreviewHtml(injectPreviewLogo(buildCampSurveyPreviewHtml({
         memberName: '홍길동',
@@ -296,7 +319,7 @@ export default function AdminEmail() {
       if (!cancelled) setCampSurveyMemberLink(link);
     });
     return () => { cancelled = true; };
-  }, [campDateRange, campSettings, campTestMember]);
+  }, [campDateRange, campSettings, campPreviewMember]);
 
   const campReminderLogs = useMemo(
     () => logs.filter(log => log.dedupe_key?.startsWith('camp-survey-') || log.subject.includes('캠프 참여 시간')),
@@ -318,11 +341,13 @@ export default function AdminEmail() {
     setLoading(true);
     const syncResult = await adminApi('sync_automation_rules', {});
     if (syncResult.error) toast.error(`규칙 동기화 실패: ${syncResult.error.message}`);
-    const [rulesRes, logsRes, runsRes, campRes] = await Promise.all([
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const [rulesRes, logsRes, runsRes, campRes, cooldownRes] = await Promise.all([
       supabase.from('email_automation_rules').select('*').order('sort_order'),
-      supabase.from('email_send_logs').select('*').order('sent_at', { ascending: false }).limit(30),
+      supabase.from('email_send_logs').select('*').order('sent_at', { ascending: false }).gte('sent_at', since24h).limit(200),
       supabase.from('email_automation_runs').select('*').order('checked_at', { ascending: false }).limit(10),
       supabase.from('camp_settings').select('title, start_date, end_date, daily_open_time, daily_close_time, enabled').eq('enabled', true).order('start_date', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('email_send_state').select('value').eq('key', 'send_cooldown').maybeSingle(),
     ]);
     if (rulesRes.error) toast.error(rulesRes.error.message);
     else setRules((rulesRes.data || []) as EmailAutomationRule[]);
@@ -332,6 +357,8 @@ export default function AdminEmail() {
     else setAutomationRuns((runsRes.data || []) as EmailAutomationRun[]);
     if (campRes.data) setCampSettings(campRes.data);
     else setCampSettings(null);
+    const cooldownRetryAt = cooldownRes.data?.value?.retryAt as string | undefined;
+    setRateLimitRetryAt(cooldownRetryAt && new Date(cooldownRetryAt) > new Date() ? cooldownRetryAt : null);
     setLoading(false);
   }, []);
 
@@ -339,19 +366,19 @@ export default function AdminEmail() {
 
   useEffect(() => {
     if (membersWithEmail.length === 0) return;
-    const testMember = membersWithEmail.find(
-      member => member.email?.trim().toLowerCase() === TEST_EMAIL_RECIPIENT.toLowerCase(),
-    );
-    setTestRecipientIds(prev => (
-      prev.length > 0 ? prev : testMember ? [testMember.id] : []
-    ));
+    setTestRecipientIds(prev => (prev.length > 0 ? prev : [membersWithEmail[0].id]));
     setManualRecipientIds(prev => (prev.length > 0 ? prev : membersWithEmail.map(member => member.id)));
+    setCampRecipientIds(prev => {
+      const validIds = new Set(campRecipients.map(member => member.id));
+      const kept = prev.filter(id => validIds.has(id));
+      return kept.length > 0 ? kept : campRecipients.map(member => member.id);
+    });
     setAutomationPreviewMemberId(prev => (
       prev && membersWithEmail.some(member => member.id === prev)
         ? prev
         : membersWithEmail[0].id
     ));
-  }, [membersWithEmail]);
+  }, [campRecipients, membersWithEmail]);
 
   useEffect(() => {
     if (testSessionId || selectableSessions.length === 0) return;
@@ -425,11 +452,6 @@ export default function AdminEmail() {
     }
 
     const recipients = membersWithEmail.filter(member => testRecipientIds.includes(member.id));
-    if (recipients.every(member => member.email?.trim().toLowerCase() !== TEST_EMAIL_RECIPIENT.toLowerCase())) {
-      toast.error(`테스트 발송은 ${TEST_EMAIL_RECIPIENT} 만 가능합니다.`);
-      return;
-    }
-
     const rule = findRuleForKind(rules, testKind);
 
     setSendingTest(true);
@@ -465,7 +487,13 @@ export default function AdminEmail() {
     }
 
     setSendingManual(true);
-    const { data, error } = await invokeWithAdminToken<{ sent?: number; error?: string }>('send-member-email', {
+    const { data, error } = await invokeWithAdminToken<{
+      sent?: number;
+      error?: string;
+      rateLimited?: boolean;
+      retryAt?: string;
+      deferredCount?: number;
+    }>('send-member-email', {
       body: {
         recipientIds: manualRecipientIds,
         subject: manualSubject.trim(),
@@ -483,8 +511,17 @@ export default function AdminEmail() {
       toast.error(data.error);
       return;
     }
+    if (data?.rateLimited) {
+      setRateLimitRetryAt(data.retryAt ?? null);
+      const retryTime = data.retryAt
+        ? new Date(data.retryAt).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })
+        : '';
+      toast.warning(`발송 제한 도달 — ${data.sent ?? 0}명 발송 완료, ${data.deferredCount ?? 0}명 미발송. ${retryTime ? retryTime + ' 이후 재시도 가능합니다.' : ''}`);
+      load();
+      return;
+    }
 
-    toast.success(`${data.sent ?? manualRecipientIds.length}명에게 발송했습니다.`);
+    toast.success(`${data?.sent ?? manualRecipientIds.length}명에게 발송했습니다.`);
     setManualSubject('');
     setManualBody('');
     load();
@@ -495,14 +532,16 @@ export default function AdminEmail() {
       toast.error('활성화된 캠프 설정이 없습니다.');
       return;
     }
-    if (!campTestMember) {
-      toast.error(`테스트 발송은 ${TEST_EMAIL_RECIPIENT} 등록 멤버가 필요합니다.`);
+    if (campRecipientIds.length === 0) {
+      toast.error('수신자를 선택해주세요.');
       return;
     }
 
+    const recipients = campRecipients.filter(member => campRecipientIds.includes(member.id));
+
     setSendingCampTest(true);
     const { error, sent } = await sendCampSurveyTestEmails({
-      members: [campTestMember],
+      members: recipients,
       campTitle: campSettings.title,
       campDateRange,
     });
@@ -513,7 +552,7 @@ export default function AdminEmail() {
       return;
     }
 
-    toast.success(`캠프 설문 리마인드 테스트 ${sent}건 발송 (${TEST_EMAIL_RECIPIENT})`);
+    toast.success(`캠프 설문 리마인드 ${sent}건 발송`);
     load();
   };
 
@@ -571,6 +610,25 @@ export default function AdminEmail() {
                   </StatusPill>
                   <StatusPill tone="neutral">오픈 {latestAutomationRun.opened}</StatusPill>
                   <StatusPill tone="neutral">마감 {latestAutomationRun.closed}</StatusPill>
+                </div>
+              )}
+
+              <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2.5 text-xs">
+                <div className="font-bold text-muted-foreground">최근 24시간 발송</div>
+                <div className="mt-1.5 flex flex-wrap gap-2">
+                  <StatusPill tone="accent">성공 {metrics24h.sent}</StatusPill>
+                  <StatusPill tone={metrics24h.failed > 0 ? 'danger' : 'neutral'}>실패 {metrics24h.failed}</StatusPill>
+                  <StatusPill tone={deliveryStats.bounced > 0 ? 'danger' : 'neutral'}>영구반송 {deliveryStats.bounced}명</StatusPill>
+                  <StatusPill tone={deliveryStats.unsubscribed > 0 ? 'neutral' : 'neutral'}>수신거부 {deliveryStats.unsubscribed}명</StatusPill>
+                </div>
+              </div>
+
+              {rateLimitCooldownActive && rateLimitRetryAt && (
+                <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 px-3 py-2.5 text-xs font-medium text-amber-800 dark:text-amber-200">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    Gmail 발송 제한 — {new Date(rateLimitRetryAt).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })} 이후 재시도 가능합니다.
+                  </span>
                 </div>
               )}
 
@@ -817,8 +875,16 @@ export default function AdminEmail() {
           {campSettings && (
             <Panel title="리마인드 메일 미리보기" icon={Mail}>
               <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>수신자</Label>
+                  <MemberRecipientPicker
+                    members={campRecipients}
+                    selectedIds={campRecipientIds}
+                    onChange={setCampRecipientIds}
+                  />
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  {campTestMember?.full_name || '홍길동'}님 기준 · 실제 22:00 자동 발송과 동일한 HTML
+                  {campPreviewMember?.full_name || '홍길동'}님 기준 · 실제 22:00 자동 발송과 동일한 HTML
                 </p>
                 {campPreviewHtml && (
                   <iframe
@@ -830,15 +896,12 @@ export default function AdminEmail() {
                 )}
                 <Button
                   className="w-full sm:w-auto"
-                  disabled={sendingCampTest || !campTestMember}
+                  disabled={sendingCampTest || campRecipientIds.length === 0}
                   onClick={() => void sendCampTestMail()}
                 >
                   {sendingCampTest ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}
-                  테스트 발송 ({TEST_EMAIL_RECIPIENT})
+                  {campRecipientIds.length}명에게 캠프 설문 발송
                 </Button>
-                {!campTestMember && (
-                  <p className="text-xs text-destructive">멤버 관리에 {TEST_EMAIL_RECIPIENT} 이메일이 등록되어 있어야 테스트 발송할 수 있습니다.</p>
-                )}
               </div>
             </Panel>
           )}
@@ -870,7 +933,7 @@ export default function AdminEmail() {
         <Panel
           title="테스트 발송"
           icon={Send}
-          description={`실제 세션·수신자 기준으로 HTML을 확인하고 발송합니다. 테스트 발송은 ${TEST_EMAIL_RECIPIENT} 만 가능합니다.`}
+          description="실제 세션·수신자 기준으로 HTML을 확인하고 발송합니다."
         >
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -935,6 +998,14 @@ export default function AdminEmail() {
 
       {activeTab === 'send' && (
         <Panel title="수동 발송" icon={Mail} description="공지 등 자유 형식 메일을 보냅니다. 실제 발송과 동일한 HTML로 미리 확인할 수 있습니다.">
+          {rateLimitCooldownActive && rateLimitRetryAt && (
+            <div className="mb-4 flex items-start gap-2 rounded-lg bg-amber-500/10 px-3 py-2.5 text-xs font-medium text-amber-800 dark:text-amber-200">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                Gmail 발송 제한 — {new Date(rateLimitRetryAt).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })} 이후 재시도 가능합니다.
+              </span>
+            </div>
+          )}
           <form onSubmit={sendManual} className="space-y-4">
             <div className="space-y-2">
               <Label>수신자</Label>

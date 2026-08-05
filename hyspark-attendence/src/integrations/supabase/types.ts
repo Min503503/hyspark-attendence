@@ -457,6 +457,10 @@ export type Database = {
           role: string
           status: string
           updated_at: string
+          mail_delivery_status: string
+          bounce_count: number
+          last_bounce_at: string | null
+          last_bounce_reason: string | null
         }
         Insert: {
           cohort_label?: string | null
@@ -469,6 +473,10 @@ export type Database = {
           role?: string
           status?: string
           updated_at?: string
+          mail_delivery_status?: string
+          bounce_count?: number
+          last_bounce_at?: string | null
+          last_bounce_reason?: string | null
         }
         Update: {
           cohort_label?: string | null
@@ -481,6 +489,10 @@ export type Database = {
           role?: string
           status?: string
           updated_at?: string
+          mail_delivery_status?: string
+          bounce_count?: number
+          last_bounce_at?: string | null
+          last_bounce_reason?: string | null
         }
         Relationships: []
       }

@@ -5,6 +5,7 @@ export type AttendanceStatus = 'present' | 'late' | 'absent' | 'excused_absent' 
 export type AttendanceCodeStatus = 'inactive' | 'active' | 'expired';
 export type CheckInMethod = 'qr' | 'code' | 'manual' | 'auto';
 export type RiskState = 'stable' | 'counseling' | 'withdrawal';
+export type MailDeliveryStatus = 'active' | 'unsubscribed' | 'bounced';
 
 export interface Profile {
   id: string;
@@ -15,6 +16,10 @@ export interface Profile {
   member_code?: string;
   cohort_label?: string;
   status: MemberStatus;
+  mail_delivery_status: MailDeliveryStatus;
+  bounce_count: number;
+  last_bounce_at?: string;
+  last_bounce_reason?: string;
 }
 
 export interface MemberSummary {
