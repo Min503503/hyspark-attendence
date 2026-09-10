@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { CAMP_DEMERIT_OFFSET, PENALTY_POLICY, getRiskState } from '@/types';
+import { getRiskState } from '@/types';
 import { Button } from '@/components/ui/button';
 import { StatusPill } from '@/components/app-ui';
 import PinCodeInput from '@/components/member/PinCodeInput';
@@ -62,18 +62,27 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
   const view = useMemo(() => {
     const presentCount = records.filter(record => record.status === 'present').length;
     const lateCount = records.filter(record => record.status === 'late').length;
-    const absentCount = records.filter(record =>
-      record.status === 'absent' || record.status === 'excused_absent' || record.status === 'unexcused_absent',
+    const earlyLeaveCount = records.filter(record => record.status === 'early_leave').length;
+    const unexcusedAbsentCount = records.filter(record =>
+      record.status === 'absent' || record.status === 'unexcused_absent',
     ).length;
-    const rawDemeritPoints = records.reduce((sum, record) => sum + record.demerit_points, 0);
-    const campCreditTotal = campResponses.reduce((sum, entry) => sum + entry.demerit_credit, 0);
-    const demeritPoints = Math.max(0, rawDemeritPoints - campCreditTotal);
-    const riskState = getRiskState(demeritPoints);
-    const countedRecords = records.filter(record =>
-      ['present', 'late', 'absent', 'excused_absent', 'unexcused_absent'].includes(record.status),
+    const excusedAbsentCount = records.filter(record => record.status === 'excused_absent').length;
+
+    const demeritPoints = records.reduce(
+      (sum, record) => sum + Number(record.demerit_points || 0),
+      0,
     );
-    const attendanceRate = countedRecords.length > 0
-      ? Math.round(((presentCount + lateCount) / countedRecords.length) * 100)
+
+    const riskState = getRiskState(demeritPoints);
+
+    const progressedSessionCount = sessions.filter(session =>
+      ['open', 'closed', 'archived'].includes(session.status),
+    ).length;
+
+    const attendanceRate = progressedSessionCount > 0
+      ? Math.round(
+          ((presentCount + lateCount + earlyLeaveCount) / progressedSessionCount) * 100,
+        )
       : 0;
 
     const openSession = sessions.find(session => session.status === 'open');
@@ -96,19 +105,20 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
     return {
       presentCount,
       lateCount,
-      absentCount,
+      earlyLeaveCount,
+      unexcusedAbsentCount,
+      excusedAbsentCount,
       demeritPoints,
-      rawDemeritPoints,
-      campCreditTotal,
       riskState,
       attendanceRate,
+      progressedSessionCount,
       openSession,
       openTimeline,
       existingOpenRecord,
       nextSession,
       recentRecords,
     };
-  }, [records, sessions, now, campResponses]);
+  }, [records, sessions, now]);
 
   const isCheckInAvailable = view.openSession?.status === 'open'
     && view.openSession?.attendance_code_status === 'active'
@@ -258,40 +268,69 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
             <div className="member-card p-5">
               <div className="flex items-center gap-5">
                 <AttendanceRing rate={view.attendanceRate} />
-                <div className="flex-1 space-y-3">
+
+                <div className="min-w-0 flex-1">
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground">누적 출석률</p>
-                    <p className="mt-0.5 text-sm text-muted-foreground">
-                      출석 + 지각 / 전체 세션
+                    <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                      출석 + 지각 + 조퇴 / 현재까지 진행 세션
                     </p>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="rounded-xl bg-secondary/50 p-3">
-                      <p className="text-[10px] font-semibold text-muted-foreground">벌점</p>
-                      <p className="text-xl font-extrabold tabular-nums">{view.demeritPoints}</p>
-                      {view.campCreditTotal > 0 && (
-                        <p className="mt-0.5 text-[10px] text-primary">
-                          캠프 상쇄 -{view.campCreditTotal.toFixed(2)}
-                        </p>
-                      )}
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="rounded-xl bg-secondary/50 p-3 text-center">
+                      <p className="text-[10px] font-semibold text-muted-foreground">출석</p>
+                      <p className="mt-0.5 text-xl font-extrabold tabular-nums text-status-present">
+                        {view.presentCount}
+                      </p>
                     </div>
-                    <div className="rounded-xl bg-secondary/50 p-3">
-                      <p className="text-[10px] font-semibold text-muted-foreground">결석</p>
-                      <p className="text-xl font-extrabold tabular-nums text-status-absent">{view.absentCount}</p>
+
+                    <div className="rounded-xl bg-secondary/50 p-3 text-center">
+                      <p className="text-[10px] font-semibold text-muted-foreground">지각</p>
+                      <p className="mt-0.5 text-xl font-extrabold tabular-nums text-status-late">
+                        {view.lateCount}
+                      </p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-5 grid grid-cols-3 gap-2">
+              <div className="mt-5 grid grid-cols-4 gap-2">
                 {[
-                  { label: '출석', value: view.presentCount, tone: 'text-status-present' },
-                  { label: '지각', value: view.lateCount, tone: 'text-status-late' },
-                  { label: '결석', value: view.absentCount, tone: 'text-status-absent' },
+                  {
+                    label: '조퇴',
+                    value: view.earlyLeaveCount,
+                    tone: 'text-status-late',
+                  },
+                  {
+                    label: '미인정결석',
+                    value: view.unexcusedAbsentCount,
+                    tone: 'text-status-absent',
+                  },
+                  {
+                    label: '인정결석',
+                    value: view.excusedAbsentCount,
+                    tone: 'text-muted-foreground',
+                  },
+                  {
+                    label: '벌점',
+                    value: view.demeritPoints,
+                    tone: 'text-foreground',
+                  },
                 ].map(item => (
-                  <div key={item.label} className="rounded-xl border border-border/50 bg-background/60 p-3 text-center">
-                    <p className="text-[10px] font-medium text-muted-foreground">{item.label}</p>
-                    <p className={cn('mt-0.5 text-xl font-extrabold tabular-nums', item.tone)}>{item.value}</p>
+                  <div
+                    key={item.label}
+                    className="rounded-xl border border-border/50 bg-background/60 px-2 py-3 text-center"
+                  >
+                    <p className="whitespace-nowrap text-[9px] font-medium text-muted-foreground">
+                      {item.label}
+                    </p>
+                    <p className={cn(
+                      'mt-0.5 text-xl font-extrabold tabular-nums',
+                      item.tone,
+                    )}>
+                      {item.value}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -317,11 +356,9 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
               <h3 className="text-sm font-extrabold">벌점 정책</h3>
               <div className="mt-3 space-y-2">
                 {[
-                  { label: '지각', value: `${PENALTY_POLICY.late_points}점` },
-                  { label: '결석', value: `${PENALTY_POLICY.absent_points}점` },
-                  { label: '캠프 상쇄', value: `${CAMP_DEMERIT_OFFSET.hours_per_block}시간당 ${CAMP_DEMERIT_OFFSET.credit_per_block}점` },
-                  { label: '면담 기준', value: `${PENALTY_POLICY.counseling_threshold}점 이상` },
-                  { label: '탈회 기준', value: `${PENALTY_POLICY.withdrawal_threshold}점 이상` },
+                  { label: '결석', value: '1점' },
+                  { label: '조퇴 + 지각', value: '2회당 1점' },
+                  { label: '운영진 면담', value: '4점 이상' },
                 ].map(item => (
                   <div key={item.label} className="flex items-center justify-between rounded-lg bg-secondary/40 px-3 py-2">
                     <span className="text-xs font-medium text-muted-foreground">{item.label}</span>
