@@ -6,14 +6,12 @@ import { StatusPill } from '@/components/app-ui';
 import PinCodeInput from '@/components/member/PinCodeInput';
 import AttendanceRing from '@/components/member/AttendanceRing';
 import MemberBottomNav, { type MemberTab } from '@/components/member/MemberBottomNav';
-import AbsenceDialog from '@/components/member/AbsenceDialog';
 import MemberActionComplete from '@/components/member/MemberActionComplete';
 import { formatCampDuration, formatCampParticipationLabel } from '@/lib/campSurvey';
 import {
   AlertTriangle,
   CalendarDays,
   Clock,
-  FileText,
   Loader2,
   MapPin,
   Timer,
@@ -38,7 +36,7 @@ type MemberHomeProps = {
 };
 
 export default function MemberHome({ initialIntent = null, onIntentHandled }: MemberHomeProps) {
-  const { currentUser, sessions, campResponses, getMemberRecords, checkIn, submitAbsenceRequest, refreshData } = useApp();
+  const { currentUser, sessions, campResponses, getMemberRecords, checkIn } = useApp();
   const records = getMemberRecords(currentUser?.id || '');
 
   const [activeTab, setActiveTab] = useState<MemberTab>('checkin');
@@ -47,7 +45,6 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CheckInResult>(null);
   const [resultMsg, setResultMsg] = useState('');
-  const [absenceOpen, setAbsenceOpen] = useState(false);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -56,9 +53,6 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
 
   useEffect(() => {
     if (!initialIntent) return;
-    if (initialIntent === 'absence') {
-      setAbsenceOpen(true);
-    }
     if (initialIntent === 'checkin') {
       setActiveTab('checkin');
     }
@@ -94,11 +88,6 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
         const bTime = new Date(b.checked_in_at || sessionById.get(b.session_id)?.start_at || 0).getTime();
         return bTime - aTime;
       });
-    const recordedSessionIds = new Set(records.map(record => record.session_id));
-    const availableForAbsence = sessions.filter(
-      session => (session.status === 'scheduled' || session.status === 'open') && !recordedSessionIds.has(session.id),
-    );
-
     const openTimeline = openSession ? getSessionTimeline(openSession, now) : null;
     const existingOpenRecord = openSession
       ? records.find(record => record.session_id === openSession.id)
@@ -118,7 +107,6 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
       existingOpenRecord,
       nextSession,
       recentRecords,
-      availableForAbsence,
     };
   }, [records, sessions, now, campResponses]);
 
@@ -149,22 +137,6 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
     }
   };
 
-  const handleAbsenceSubmit = async (payload: {
-    sessionId: string;
-    type: 'excused_absent' | 'unexcused_absent';
-    categoryLabel?: string;
-    note?: string;
-  }) => {
-    if (!currentUser) return false;
-    return submitAbsenceRequest(
-      payload.sessionId,
-      currentUser.id,
-      payload.type,
-      payload.categoryLabel,
-      payload.note,
-    );
-  };
-
   const cohortLabel = currentUser?.cohort_label || 'HySpark 학회원';
 
   return (
@@ -186,16 +158,6 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
           <section className="space-y-3">
             {view.openSession && view.openTimeline ? (
               <div className="member-card overflow-hidden">
-                <div className="member-card-accent px-4 py-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-status-present animate-pulse-dot" />
-                      <span className="text-[11px] font-extrabold text-primary">출석 진행 중</span>
-                    </div>
-                    <StatusPill tone="accent">{view.openTimeline.phaseLabel}</StatusPill>
-                  </div>
-                </div>
-
                 <div className="space-y-3 p-4">
                   <div>
                     <p className="text-[11px] font-semibold text-muted-foreground">오늘의 세션</p>
@@ -288,26 +250,6 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
               </div>
             )}
 
-            {view.availableForAbsence.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setAbsenceOpen(true)}
-                className="member-action-row flex w-full items-center justify-between rounded-xl border border-border/60 bg-card px-3 py-3 text-left shadow-sm transition-all active:scale-[0.99]"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <FileText className="h-3.5 w-3.5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-extrabold">결석 신청</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {view.availableForAbsence.length}개 세션 신청 가능
-                    </p>
-                  </div>
-                </div>
-                <span className="text-xs font-bold text-primary">신청</span>
-              </button>
-            )}
           </section>
         )}
 
@@ -500,12 +442,6 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
         checkInBadge={Boolean(view.openSession && !view.existingOpenRecord)}
       />
 
-      <AbsenceDialog
-        open={absenceOpen}
-        onOpenChange={setAbsenceOpen}
-        sessions={view.availableForAbsence}
-        onSubmit={handleAbsenceSubmit}
-      />
     </div>
   );
 }
