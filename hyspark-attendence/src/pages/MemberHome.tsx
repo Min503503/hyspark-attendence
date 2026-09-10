@@ -4,7 +4,6 @@ import { CAMP_DEMERIT_OFFSET, PENALTY_POLICY, getRiskState } from '@/types';
 import { Button } from '@/components/ui/button';
 import { StatusPill } from '@/components/app-ui';
 import PinCodeInput from '@/components/member/PinCodeInput';
-import SessionPhaseBar from '@/components/member/SessionPhaseBar';
 import AttendanceRing from '@/components/member/AttendanceRing';
 import MemberBottomNav, { type MemberTab } from '@/components/member/MemberBottomNav';
 import AbsenceDialog from '@/components/member/AbsenceDialog';
@@ -25,9 +24,8 @@ import {
   ATTENDANCE_STATUS_TONE,
   formatDateTime,
   formatTime,
+  formatRemaining,
   getMemberInitial,
-  getRiskLabel,
-  getRiskTone,
   getSessionTimeline,
 } from '@/lib/member-utils';
 import { cn } from '@/lib/utils';
@@ -171,7 +169,7 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
 
   return (
     <div className="member-shell pb-20">
-      <div className="member-hero px-4 pb-3 pt-1">
+      <div className="member-hero px-4 py-3">
         <div className="flex items-center gap-2.5">
           <div className="member-avatar flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-extrabold text-primary-foreground">
             {getMemberInitial(currentUser?.full_name || '')}
@@ -180,9 +178,6 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
             <p className="truncate text-sm font-extrabold tracking-tight">{currentUser?.full_name}님</p>
             <p className="truncate text-[11px] font-medium text-primary-foreground/70">{cohortLabel}</p>
           </div>
-          <StatusPill tone={getRiskTone(view.riskState)}>
-            {getRiskLabel(view.riskState)}
-          </StatusPill>
         </div>
       </div>
 
@@ -219,13 +214,19 @@ export default function MemberHome({ initialIntent = null, onIntentHandled }: Me
                     </div>
                   </div>
 
-                  <SessionPhaseBar
-                    phase={view.openTimeline.phase}
-                    now={now}
-                    attendanceDeadline={view.openTimeline.attendanceDeadline}
-                    lateDeadline={view.openTimeline.lateDeadline}
-                    compact
-                  />
+                  <div className="member-countdown flex items-center justify-between rounded-lg px-3 py-2.5">
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      {view.openTimeline.phase === 'late' ? '지각 마감까지' : '출석 마감까지'}
+                    </span>
+                    <span className="text-sm font-extrabold tabular-nums text-foreground">
+                      {formatRemaining(
+                        now,
+                        view.openTimeline.phase === 'late'
+                          ? view.openTimeline.lateDeadline
+                          : view.openTimeline.attendanceDeadline
+                      )}
+                    </span>
+                  </div>
 
                   {view.existingOpenRecord ? (
                     <MemberActionComplete

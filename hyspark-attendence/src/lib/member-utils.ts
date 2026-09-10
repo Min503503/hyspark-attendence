@@ -3,6 +3,7 @@ import type { Session } from '@/types';
 export const ATTENDANCE_STATUS_LABEL: Record<string, string> = {
   present: '출석',
   late: '지각',
+  early_leave: '조퇴',
   absent: '결석',
   excused_absent: '인정 결석',
   unexcused_absent: '미인정 결석',
@@ -11,6 +12,7 @@ export const ATTENDANCE_STATUS_LABEL: Record<string, string> = {
 export const ATTENDANCE_STATUS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
   present: 'success',
   late: 'warning',
+  early_leave: 'warning',
   absent: 'danger',
   excused_absent: 'neutral',
   unexcused_absent: 'danger',

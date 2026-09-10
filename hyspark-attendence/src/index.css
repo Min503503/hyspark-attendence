@@ -257,8 +257,8 @@
     hsl(var(--member-hero-to)) 100%
   );
   color: hsl(var(--primary-foreground));
-  border-radius: 0 0 1.5rem 1.5rem;
-  margin-bottom: 0.5rem;
+  border-radius: 1.5rem;
+  margin: 0 1rem 0.75rem;
 }
 
 .member-avatar {
