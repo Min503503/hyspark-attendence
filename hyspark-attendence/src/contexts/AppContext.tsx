@@ -133,15 +133,26 @@ const AppContext = createContext<AppState | undefined>(undefined);
 function computeMemberSummary(
   memberId: string,
   records: AttendanceRecord[],
-  campEntries: CampDemeritEntry[] = [],
+  _campEntries: CampDemeritEntry[] = [],
 ): MemberSummary {
   const memberRecords = records.filter(r => r.member_id === memberId);
   const present = memberRecords.filter(r => r.status === 'present').length;
   const late = memberRecords.filter(r => r.status === 'late').length;
-  const absent = memberRecords.filter(r => r.status === 'absent' || r.status === 'unexcused_absent' || r.status === 'excused_absent').length;
-  const raw_demerit_points = memberRecords.reduce((sum, r) => sum + r.demerit_points, 0);
-  const camp_credit_total = campEntries.reduce((sum, entry) => sum + entry.demerit_credit, 0);
-  const demerit_points = Math.max(0, raw_demerit_points - camp_credit_total);
+
+  // 인정결석은 결석 횟수에 포함하지 않음
+  const absent = memberRecords.filter(
+    r => r.status === 'absent' || r.status === 'unexcused_absent',
+  ).length;
+
+  // 벌점은 DB에 계산되어 저장된 값을 그대로 사용
+  // 캠프 참여에 따른 별도 상쇄는 적용하지 않음
+  const raw_demerit_points = memberRecords.reduce(
+    (sum, r) => sum + Number(r.demerit_points || 0),
+    0,
+  );
+  const camp_credit_total = 0;
+  const demerit_points = raw_demerit_points;
+
   return {
     present,
     late,

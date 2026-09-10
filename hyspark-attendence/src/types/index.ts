@@ -120,9 +120,9 @@ export interface PenaltyPolicy {
 }
 
 export const PENALTY_POLICY: PenaltyPolicy = {
-  late_points: 0.5,
+  late_points: 0.0,
   absent_points: 1.0,
-  counseling_threshold: 2.0,
+  counseling_threshold: 4.0,
   withdrawal_threshold: 4.0,
   demo_day_impact: true,
 };
@@ -151,7 +151,6 @@ export const EXCEPTION_CATEGORIES = [
 ];
 
 export function getRiskState(demeritPoints: number): RiskState {
-  if (demeritPoints >= PENALTY_POLICY.withdrawal_threshold) return 'withdrawal';
   if (demeritPoints >= PENALTY_POLICY.counseling_threshold) return 'counseling';
   return 'stable';
 }
