@@ -9,10 +9,10 @@ import { Label } from '@/components/ui/label';
 import MemberHome from '@/pages/MemberHome';
 import MemberCampSurvey from '@/pages/MemberCampSurvey';
 import { APP_NAME } from '@/lib/brand';
-import SessionPhaseBar from '@/components/member/SessionPhaseBar';
 import {
   findRelevantSession,
   getSessionTimeline,
+  formatRemaining,
 } from '@/lib/member-utils';
 
 export default function Index() {
@@ -200,20 +200,18 @@ export default function Index() {
                 </form>
 
                 {sessionGuide && (
-                  <div className="mt-4 border-t border-border/45 pt-3">
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <p className="min-w-0 truncate text-[11px] font-bold">{sessionGuide.session.title}</p>
-                      <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-                        {sessionGuide.phaseLabel}
+                  <div className="mt-4 border-t border-border/45 pt-4">
+                    <p className="truncate text-lg font-extrabold tracking-tight text-foreground">
+                      {sessionGuide.session.title}
+                    </p>
+                    <div className="member-countdown mt-3 flex items-center justify-between rounded-lg px-3 py-2.5">
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        출석 마감까지
+                      </span>
+                      <span className="text-sm font-extrabold tabular-nums text-foreground">
+                        {formatRemaining(now, sessionGuide.attendanceDeadline)}
                       </span>
                     </div>
-                    <SessionPhaseBar
-                      phase={sessionGuide.phase}
-                      now={now}
-                      attendanceDeadline={sessionGuide.attendanceDeadline}
-                      lateDeadline={sessionGuide.lateDeadline}
-                      compact
-                    />
                   </div>
                 )}
               </section>
