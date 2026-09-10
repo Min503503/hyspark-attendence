@@ -46,10 +46,11 @@ export default function SessionEditor() {
   useEffect(() => {
     if (editing) {
       const d = new Date(editing.start_at);
+      const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
       setForm({
         title: editing.title,
-        start_date: d.toISOString().slice(0, 10),
-        start_time: d.toTimeString().slice(0, 5),
+        start_date: kst.toISOString().slice(0, 10),
+        start_time: kst.toISOString().slice(11, 16),
         venue_name: editing.venue_name || '',
         venue_map_url: editing.venue_map_url || '',
         check_in_open_minutes: String(editing.check_in_open_minutes),
