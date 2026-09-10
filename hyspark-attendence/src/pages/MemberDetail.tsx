@@ -12,11 +12,17 @@ import { toast } from 'sonner';
 import { DataRow, EmptyState, MetricCard, PageHeader, PageShell, StatusPill, Surface } from '@/components/app-ui';
 
 const statusLabel: Record<string, string> = {
-  present: '출석', late: '지각', absent: '결석', excused_absent: '인정 결석', unexcused_absent: '미인정 결석',
+  present: '출석',
+  late: '지각',
+  early_leave: '조퇴',
+  absent: '결석',
+  excused_absent: '인정 결석',
+  unexcused_absent: '미인정 결석',
 };
 const statusColor: Record<string, string> = {
   present: 'text-status-present border-status-present/30 bg-status-present/10',
   late: 'text-status-late border-status-late/30 bg-status-late/10',
+  early_leave: 'text-status-late border-status-late/30 bg-status-late/10',
   absent: 'text-status-absent border-status-absent/30 bg-status-absent/10',
   excused_absent: 'text-muted-foreground border-border bg-muted',
   unexcused_absent: 'text-status-absent border-status-absent/30 bg-status-absent/10',
@@ -29,6 +35,7 @@ export default function MemberDetail() {
 
   const member = members.find(m => m.id === id);
   const records = getMemberRecords(id || '');
+  const earlyLeaveCount = records.filter(r => r.status === 'early_leave').length;
 
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
@@ -128,10 +135,11 @@ export default function MemberDetail() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 animate-reveal-up" style={{ animationDelay: '60ms' }}>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 animate-reveal-up" style={{ animationDelay: '60ms' }}>
         {[
           { label: '출석', value: member.summary.present, tone: 'success' as const },
           { label: '지각', value: member.summary.late, tone: 'warning' as const },
+          { label: '조퇴', value: earlyLeaveCount, tone: 'warning' as const },
           { label: '결석', value: member.summary.absent, tone: 'danger' as const },
           { label: '벌점', value: member.summary.demerit_points, tone: member.summary.demerit_points > 0 ? 'warning' as const : 'default' as const },
         ].map(s => (
@@ -236,6 +244,7 @@ export default function MemberDetail() {
                 <SelectContent>
                   <SelectItem value="present">출석</SelectItem>
                   <SelectItem value="late">지각</SelectItem>
+                  <SelectItem value="early_leave">조퇴</SelectItem>
                   <SelectItem value="absent">결석</SelectItem>
                   <SelectItem value="excused_absent">인정 결석</SelectItem>
                   <SelectItem value="unexcused_absent">미인정 결석</SelectItem>

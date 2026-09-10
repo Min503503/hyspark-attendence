@@ -1,7 +1,7 @@
 export type Role = 'admin' | 'staff' | 'member';
 export type MemberStatus = 'active' | 'inactive';
 export type SessionStatus = 'draft' | 'scheduled' | 'open' | 'closed' | 'archived';
-export type AttendanceStatus = 'present' | 'late' | 'absent' | 'excused_absent' | 'unexcused_absent';
+export type AttendanceStatus = 'present' | 'late' | 'early_leave' | 'absent' | 'excused_absent' | 'unexcused_absent';
 export type AttendanceCodeStatus = 'inactive' | 'active' | 'expired';
 export type CheckInMethod = 'qr' | 'code' | 'manual' | 'auto';
 export type RiskState = 'stable' | 'counseling' | 'withdrawal';
@@ -157,7 +157,6 @@ export function getRiskState(demeritPoints: number): RiskState {
 }
 
 export function getDemeritPoints(status: AttendanceStatus): number {
-  if (status === 'late') return PENALTY_POLICY.late_points;
   if (status === 'absent') return PENALTY_POLICY.absent_points;
   if (status === 'unexcused_absent') return PENALTY_POLICY.absent_points;
   return 0;

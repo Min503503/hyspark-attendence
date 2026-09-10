@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '@/contexts/AppContext';
 import type { AttendanceRecord, AttendanceStatus } from '@/types';
-import { PENALTY_POLICY } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,12 +14,18 @@ import { EmptyState, MetricCard, PageHeader, PageShell, StatusPill, Surface } fr
 const statusBg: Record<string, string> = {
   present: 'bg-status-present/10 text-status-present border-status-present/20',
   late: 'bg-status-late/10 text-status-late border-status-late/20',
+  early_leave: 'bg-status-late/10 text-status-late border-status-late/20',
   absent: 'bg-status-absent/10 text-status-absent border-status-absent/20',
   excused_absent: 'bg-muted text-muted-foreground',
   unexcused_absent: 'bg-status-absent/10 text-status-absent border-status-absent/20',
 };
 const statusLabel: Record<string, string> = {
-  present: '출석', late: '지각', absent: '결석', excused_absent: '인정 결석', unexcused_absent: '미인정 결석',
+  present: '출석',
+  late: '지각',
+  early_leave: '조퇴',
+  absent: '결석',
+  excused_absent: '인정 결석',
+  unexcused_absent: '미인정 결석',
 };
 
 const absentStatuses = new Set(['absent', 'excused_absent', 'unexcused_absent']);
@@ -56,8 +61,9 @@ export default function SessionDetail() {
   const activeMembers = members.filter(m => m.role === 'member' && m.status === 'active');
   const presentCount = records.filter(r => r.status === 'present').length;
   const lateCount = records.filter(r => r.status === 'late').length;
+  const earlyLeaveCount = records.filter(r => r.status === 'early_leave').length;
   const absentCount = records.filter(r => absentStatuses.has(r.status)).length;
-  const attendanceRate = activeMembers.length > 0 ? Math.round(((presentCount + lateCount) / activeMembers.length) * 100) : 0;
+  const attendanceRate = activeMembers.length > 0 ? Math.round(((presentCount + lateCount + earlyLeaveCount) / activeMembers.length) * 100) : 0;
 
   // Members not yet recorded for this session
   const recordedMemberIds = new Set(records.map(r => r.member_id));
@@ -150,9 +156,10 @@ export default function SessionDetail() {
         </Surface>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 stagger-children">
         <MetricCard label="출석" value={presentCount} tone="success" />
         <MetricCard label="지각" value={lateCount} tone="warning" />
+        <MetricCard label="조퇴" value={earlyLeaveCount} tone="warning" />
         <MetricCard label="결석" value={absentCount} tone="danger" />
         <MetricCard label="출석률" value={`${attendanceRate}%`} />
       </div>
@@ -161,9 +168,8 @@ export default function SessionDetail() {
         <div className="flex items-start gap-3">
           <Info className="w-4 h-4 text-warning mt-0.5 shrink-0" />
           <div className="text-xs space-y-0.5 text-muted-foreground">
-            <p>지각 1회 = {PENALTY_POLICY.late_points}점 · 결석 1회 = {PENALTY_POLICY.absent_points}점</p>
-            <p>누적 {PENALTY_POLICY.counseling_threshold}점 이상 면담 · {PENALTY_POLICY.withdrawal_threshold}점 이상 탈회 대상</p>
-            <p className="font-medium text-foreground">벌점은 디포데이 점수에 반영됩니다.</p>
+            <p>결석 1회 = 1점 · 지각/조퇴 합산 2회당 벌점 1점</p>
+            <p className="font-medium text-foreground">인정 결석 = 0점 · 조퇴와 인정 결석은 운영진이 직접 설정합니다.</p>
           </div>
         </div>
       </Surface>
@@ -254,6 +260,7 @@ export default function SessionDetail() {
                 <SelectContent>
                   <SelectItem value="present">출석</SelectItem>
                   <SelectItem value="late">지각</SelectItem>
+                  <SelectItem value="early_leave">조퇴</SelectItem>
                   <SelectItem value="absent">결석</SelectItem>
                   <SelectItem value="excused_absent">인정 결석</SelectItem>
                   <SelectItem value="unexcused_absent">미인정 결석</SelectItem>
@@ -294,6 +301,7 @@ export default function SessionDetail() {
                 <SelectContent>
                   <SelectItem value="present">출석</SelectItem>
                   <SelectItem value="late">지각</SelectItem>
+                  <SelectItem value="early_leave">조퇴</SelectItem>
                   <SelectItem value="absent">결석</SelectItem>
                   <SelectItem value="excused_absent">인정 결석</SelectItem>
                   <SelectItem value="unexcused_absent">미인정 결석</SelectItem>
